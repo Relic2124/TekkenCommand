@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, Fragment, useState } from 'react';
 import { useCommandInput } from './hooks/useCommandInput.js';
 import type { CommandItem, KeyMapping } from './types/index.js';
 import { KeyMappingPage, loadKeyMapping, saveKeyMapping } from './KeyMappingPage.js';
+import { GuideModal } from './GuideModal.js';
 import { getNotationImageUrl } from './utils/notationImages.js';
 import { commandToNotationString, type InputNotationMode } from './utils/notationString.js';
 import './App.css';
@@ -93,6 +94,7 @@ export default function App() {
   const outputRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<Page>('main');
   const [theme, setThemeState] = useState<Theme>(loadTheme);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [keyMapping, setKeyMappingState] = useState<KeyMapping>(loadKeyMapping);
 
   useEffect(() => {
@@ -312,11 +314,16 @@ export default function App() {
           >
             {theme === 'light' ? '☀️ 라이트' : '🌙 다크'}
           </button>
+          <button type="button" className="nav-link" onClick={() => setGuideOpen(true)}>
+            가이드
+          </button>
           <button type="button" className="nav-link" onClick={() => setPage('keymap')}>
             키 매핑
           </button>
         </nav>
       </header>
+
+      {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
 
       <div className="panels">
         <section className="panel input-panel">
