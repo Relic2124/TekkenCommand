@@ -134,6 +134,7 @@ export default function App() {
     finishTextInput,
     updateText,
     startTextEdit,
+    clearSelectionAndMoveCursorToEnd,
   } = useCommandInput(keyMapping);
 
   const dragAnchorStartRef = useRef<number>(0);
@@ -291,6 +292,15 @@ export default function App() {
     if (isTextMode) textInputRef.current?.focus();
   }, [isTextMode]);
 
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (!(e.target as HTMLElement).closest('.input-area')) setSelection(null);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [setSelection]);
+
   if (page === 'keymap') {
     return (
       <KeyMappingPage
@@ -375,8 +385,38 @@ export default function App() {
                     setCursorIndex(i);
                   }}
                 >
-                  {cursorIndex === i && isCaretVisible && <span className="input-caret">|</span>}
+                  {cursorIndex === i && isCaretVisible && !(isTextMode && textEditIndex === null) && (
+                    <span className="input-caret">|</span>
+                  )}
                 </span>
+                {isTextMode && textEditIndex === null && i === cursorIndex ? (
+                  <span className="text-cursor">
+                    "
+                    <span className="inline-text-input-wrap">
+                      <span className="inline-text-input-mirror" aria-hidden="true">
+                        {currentText || '\u00A0'}
+                      </span>
+                      <input
+                        ref={textInputRef}
+                        type="text"
+                        className="inline-text-input"
+                        value={currentText}
+                        onChange={(e) => updateText(e.target.value)}
+                        onBlur={() => finishTextInput(currentText)}
+                        onKeyDown={(e) => {
+                          if (e.code === 'Enter' && e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            textInputRef.current?.blur();
+                          }
+                        }}
+                        aria-label="텍스트 입력"
+                      />
+                    </span>
+                    {isCaretVisible ? <span className="caret">|</span> : null}
+                    "
+                  </span>
+                ) : null}
                 {i < commands.length && (
                   <span
                     className={`input-command-wrap${selection && i >= selection.start && i < selection.end ? ' input-command-selected' : ''}${commands[i].type === 'text' ? ' input-command-text' : ''}${textEditIndex === i ? ' input-command-editing' : ''}`}
@@ -385,6 +425,7 @@ export default function App() {
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       if (e.button !== 0) return;
+                      if (textEditIndex !== null && textEditIndex !== i) finishTextInput(currentText);
                       if (textEditIndex === i) return;
                       dragAnchorStartRef.current = i;
                       dragAnchorEndRef.current = i + 1;
@@ -394,6 +435,7 @@ export default function App() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (textEditIndex !== null && textEditIndex !== i) finishTextInput(currentText);
                       if (textEditIndex === i) return;
                       if (didDragRef.current) {
                         didDragRef.current = false;
@@ -404,7 +446,7 @@ export default function App() {
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      if (commands[i].type === 'text') startTextEdit(i);
+                      if (commands[i].type === 'text' && !isTextMode) startTextEdit(i);
                     }}
                     title={commands[i].type === 'text' ? '더블클릭하여 수정' : undefined}
                   >
@@ -421,11 +463,11 @@ export default function App() {
                             className="inline-text-input"
                             value={currentText}
                             onChange={(e) => updateText(e.target.value)}
+                            onBlur={() => finishTextInput(currentText)}
                             onKeyDown={(e) => {
                               if (e.code === 'Enter' && e.key === 'Enter') {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                finishTextInput(currentText);
                                 textInputRef.current?.blur();
                               }
                             }}
@@ -442,33 +484,25 @@ export default function App() {
                 )}
               </Fragment>
             ))}
-            {isTextMode && textEditIndex === null ? (
-              <span className="text-cursor">
-                "
-                <span className="inline-text-input-wrap">
-                  <span className="inline-text-input-mirror" aria-hidden="true">
-                    {currentText || '\u00A0'}
-                  </span>
-                  <input
-                    ref={textInputRef}
-                    type="text"
-                    className="inline-text-input"
-                    value={currentText}
-                    onChange={(e) => updateText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.code === 'Enter' && e.key === 'Enter') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        finishTextInput(currentText);
-                        textInputRef.current?.blur();
-                      }
-                    }}
-                    aria-label="텍스트 입력"
-                  />
-                </span>
-                {isCaretVisible ? <span className="caret">|</span> : null}"
-              </span>
-            ) : null}
+            <span
+              className="input-area-fill"
+              aria-label="빈 영역"
+              onMouseDown={(e) => {
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                if (textEditIndex !== null) finishTextInput(currentText);
+                clearSelectionAndMoveCursorToEnd();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (didDragRef.current) {
+                  didDragRef.current = false;
+                  return;
+                }
+                if (textEditIndex !== null) finishTextInput(currentText);
+                clearSelectionAndMoveCursorToEnd();
+              }}
+            />
           </div>
           <div className="actions">
             <button

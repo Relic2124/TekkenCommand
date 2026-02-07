@@ -9,9 +9,9 @@ export function keyCodeToLabel(code: string): string {
   return code;
 }
 
-/** 키 코드 배열을 쉼표 구분 문자열로 */
-export function keyCodesToLabel(codes: string[]): string {
-  return codes.length ? codes.map(keyCodeToLabel).join(' + ') : '—';
+/** 키 코드 배열을 구분자로 이어 붙인 문자열 (기본 ' + ') */
+export function keyCodesToLabel(codes: string[], separator = ' + '): string {
+  return codes.length ? codes.map(keyCodeToLabel).join(separator) : '—';
 }
 
 /**

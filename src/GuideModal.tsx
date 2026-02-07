@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { defaultKeyMapping, keyCodeToLabel } from './utils/keyMapping.js';
+import { defaultKeyMapping, keyCodesToLabel } from './utils/keyMapping.js';
 import guideInputGif from './guide_images/guide_input.gif';
 import guideOutputGif from './guide_images/guide_output.gif';
 import './GuideModal.css';
@@ -83,25 +83,22 @@ function GuideKeysSection() {
   const b = defaultKeyMapping.buttons;
   const s = defaultKeyMapping.special;
 
-  const dirRows = [
+  const keyRows: { label: string; codes: string[] }[] = [
     { label: '↑', codes: d.u },
     { label: '↓', codes: d.d },
     { label: '→', codes: d.f },
     { label: '←', codes: d.b },
     { label: 'n', codes: d.n },
-  ];
-  const buttonRows = [
     { label: 'LP', codes: b['1'] },
     { label: 'RP', codes: b['2'] },
     { label: 'LK', codes: b['3'] },
     { label: 'RK', codes: b['4'] },
     { label: 'AP', codes: b['1+2'] },
     { label: 'AK', codes: b['3+4'] },
-  ]
-  const specialRows = [
     { label: '히트 버스트/히트 스매시', codes: s.heat },
     { label: '레이지 아츠', codes: s.rage },
   ];
+  const formatKeys = (codes: string[]) => keyCodesToLabel(codes, ', ');
 
   return (
     <div className="guide-section guide-keys">
@@ -113,22 +110,10 @@ function GuideKeysSection() {
           </tr>
         </thead>
         <tbody>
-          {dirRows.map(({ label, codes }) => (
+          {keyRows.map(({ label, codes }) => (
             <tr key={label}>
               <td>{label}</td>
-              <td>{codes.map(keyCodeToLabel).join(', ')}</td>
-            </tr>
-          ))}
-          {buttonRows.map(({ label, codes }) => (
-            <tr key={label}>
-              <td>{label}</td>
-              <td>{codes.map(keyCodeToLabel).join(', ')}</td>
-            </tr>
-          ))}
-          {specialRows.map(({ label, codes }) => (
-            <tr key={label}>
-              <td>{label}</td>
-              <td>{codes.map(keyCodeToLabel).join(', ')}</td>
+              <td>{formatKeys(codes)}</td>
             </tr>
           ))}
         </tbody>

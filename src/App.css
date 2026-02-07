@@ -173,6 +173,14 @@
   gap: calc(4px * 0.66); /* 커맨드 사이 간격 0.66 비율 */
 }
 
+.input-area-fill {
+  flex: 1;
+  min-width: 24px;
+  min-height: 1.5em;
+  align-self: stretch;
+  cursor: text;
+}
+
 .input-slot {
   display: inline-flex;
   align-items: center;

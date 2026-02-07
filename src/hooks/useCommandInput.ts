@@ -571,6 +571,12 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     setSelectionState(null);
   }, []);
 
+  /** 선택 해제 후 커서를 맨 끝으로 이동 (빈 영역 클릭 등) */
+  const clearSelectionAndMoveCursorToEnd = useCallback(() => {
+    setSelectionState(null);
+    setCursorIndexState(commandsRef.current.length);
+  }, []);
+
   return {
     commands,
     cursorIndex,
@@ -591,5 +597,6 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     finishTextInput,
     updateText,
     startTextEdit,
+    clearSelectionAndMoveCursorToEnd,
   };
 }
