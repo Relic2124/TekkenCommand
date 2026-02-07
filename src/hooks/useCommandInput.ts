@@ -235,12 +235,24 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
 
       if (toAdd.length > 0) {
         const idx = cursorIndexRef.current;
+        const onlyHold =
+          toAdd.length === 1 &&
+          toAdd[0].type === 'direction' &&
+          String((toAdd[0] as { value: string }).value).endsWith('hold');
         setCommands((prev) => {
           const at = Math.min(idx, prev.length);
+          if (onlyHold && at > 0) {
+            return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+          }
           return [...prev.slice(0, at), ...toAdd, ...prev.slice(at)];
         });
-        cursorIndexRef.current = idx + toAdd.length;
-        setCursorIndexState(cursorIndexRef.current);
+        if (onlyHold && idx > 0) {
+          cursorIndexRef.current = idx;
+          setCursorIndexState(idx);
+        } else {
+          cursorIndexRef.current = idx + toAdd.length;
+          setCursorIndexState(cursorIndexRef.current);
+        }
       }
     };
 
