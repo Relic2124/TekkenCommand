@@ -30,6 +30,8 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const commandsLengthRef = useRef(0);
   const commandsRef = useRef<CommandItem[]>([]);
   const [isTextMode, setIsTextMode] = useState(false);
+  const [textEditIndex, setTextEditIndex] = useState<number | null>(null);
+  const textEditIndexRef = useRef<number | null>(null);
   const [currentText, setCurrentText] = useState('');
   const pressedKeys = useRef<Set<string>>(new Set());
   const keyMapping = useRef<KeyMapping>({ ...defaultKeyMapping, ...customMapping });
@@ -123,11 +125,16 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           return;
         }
         if (code === 'Backspace') {
+          const target = event.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            return;
+          }
           setCurrentText((prev) => prev.slice(0, -1));
           event.preventDefault();
           return;
         }
         if (code === 'Escape') {
+          setTextEditIndex(null);
           setIsTextMode(false);
           setCurrentText('');
           event.preventDefault();
@@ -484,11 +491,21 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     setCursorIndexState((prev) => Math.max(0, prev - 1));
   }, []);
 
-  /** 텍스트 입력 완료: 커서 위치에 텍스트 삽입 후 텍스트 모드 종료 */
+  /** 텍스트 입력 완료: 커서 위치에 삽입 또는 지정 인덱스 항목 교체 후 텍스트 모드 종료 */
   const finishTextInput = useCallback(
     (value: string) => {
       const trimmed = value.trim();
-      if (trimmed) {
+      const editingAt = textEditIndexRef.current;
+      if (editingAt !== null) {
+        if (trimmed) {
+          setCommands((prev) =>
+            prev.map((cmd, i) =>
+              i === editingAt ? { type: 'text' as const, value: trimmed } : cmd
+            )
+          );
+        }
+        setTextEditIndex(null);
+      } else if (trimmed) {
         setCommands((prev) => {
           const idx = Math.min(cursorIndexRef.current, prev.length);
           return [...prev.slice(0, idx), { type: 'text', value: trimmed }, ...prev.slice(idx)];
@@ -501,6 +518,20 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     },
     []
   );
+
+  useEffect(() => {
+    textEditIndexRef.current = textEditIndex;
+  }, [textEditIndex]);
+
+  /** 텍스트 커맨드 더블클릭 시 해당 항목 수정 모드로 전환 */
+  const startTextEdit = useCallback((index: number) => {
+    const cmd = commandsRef.current[index];
+    if (cmd?.type === 'text') {
+      setCurrentText(cmd.value);
+      setTextEditIndex(index);
+      setIsTextMode(true);
+    }
+  }, []);
 
   const copyToClipboard = useCallback(() => {
     const sel = selectionRef.current;
@@ -551,6 +582,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     cutToClipboard,
     pasteFromClipboard,
     isTextMode,
+    textEditIndex,
     currentText,
     addCommand,
     clearCommands,
@@ -558,5 +590,6 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     toggleTextMode,
     finishTextInput,
     updateText,
+    startTextEdit,
   };
 }

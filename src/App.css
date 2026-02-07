@@ -202,6 +202,22 @@
   background: rgba(59, 130, 246, 0.45);
 }
 
+.input-command-wrap.input-command-text {
+  cursor: text;
+}
+
+.input-command-wrap.input-command-editing {
+  background: transparent !important;
+}
+
+.input-command-wrap.input-command-editing:hover {
+  background: transparent !important;
+}
+
+.input-command-wrap.input-command-editing.input-command-selected {
+  background: transparent !important;
+}
+
 .input-slot:hover {
   background: rgba(255, 255, 255, 0.06);
 }

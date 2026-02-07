@@ -127,11 +127,13 @@ export default function App() {
     setSelection,
     selectAll,
     isTextMode,
+    textEditIndex,
     currentText,
     clearCommands,
     toggleTextMode,
     finishTextInput,
     updateText,
+    startTextEdit,
   } = useCommandInput(keyMapping);
 
   const dragAnchorStartRef = useRef<number>(0);
@@ -377,12 +379,13 @@ export default function App() {
                 </span>
                 {i < commands.length && (
                   <span
-                    className={`input-command-wrap${selection && i >= selection.start && i < selection.end ? ' input-command-selected' : ''}`}
+                    className={`input-command-wrap${selection && i >= selection.start && i < selection.end ? ' input-command-selected' : ''}${commands[i].type === 'text' ? ' input-command-text' : ''}${textEditIndex === i ? ' input-command-editing' : ''}`}
                     data-position={i + 1}
                     data-command-index={i}
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       if (e.button !== 0) return;
+                      if (textEditIndex === i) return;
                       dragAnchorStartRef.current = i;
                       dragAnchorEndRef.current = i + 1;
                       isDraggingRef.current = true;
@@ -391,6 +394,7 @@ export default function App() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (textEditIndex === i) return;
                       if (didDragRef.current) {
                         didDragRef.current = false;
                         return;
@@ -398,13 +402,47 @@ export default function App() {
                       setSelection({ start: i, end: i + 1 });
                       setCursorIndex(i + 1);
                     }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (commands[i].type === 'text') startTextEdit(i);
+                    }}
+                    title={commands[i].type === 'text' ? '더블클릭하여 수정' : undefined}
                   >
-                    <InputCommand item={commands[i]} mode={inputNotationMode} />
+                    {textEditIndex === i ? (
+                      <span className="text-cursor text-cursor-inplace">
+                        "
+                        <span className="inline-text-input-wrap">
+                          <span className="inline-text-input-mirror" aria-hidden="true">
+                            {currentText || '\u00A0'}
+                          </span>
+                          <input
+                            ref={textInputRef}
+                            type="text"
+                            className="inline-text-input"
+                            value={currentText}
+                            onChange={(e) => updateText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.code === 'Enter' && e.key === 'Enter') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                finishTextInput(currentText);
+                                textInputRef.current?.blur();
+                              }
+                            }}
+                            aria-label="텍스트 수정"
+                          />
+                        </span>
+                        {isCaretVisible ? <span className="caret">|</span> : null}
+                        "
+                      </span>
+                    ) : (
+                      <InputCommand item={commands[i]} mode={inputNotationMode} />
+                    )}
                   </span>
                 )}
               </Fragment>
             ))}
-            {isTextMode ? (
+            {isTextMode && textEditIndex === null ? (
               <span className="text-cursor">
                 "
                 <span className="inline-text-input-wrap">
