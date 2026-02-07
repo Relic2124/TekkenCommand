@@ -12,8 +12,8 @@ export type ButtonNotation =
   | '1+2' | '1+3' | '1+4' | '2+3' | '2+4' | '3+4'
   | '1+2+3' | '1+2+4' | '1+3+4' | '2+3+4' | '1+2+3+4';
 
-/** 특수: heat burst, heat smash(히트키 토글), rage art */
-export type SpecialNotation = 'heat' | 'heatSmash' | 'rage';
+/** 특수: heat burst, rage art */
+export type SpecialNotation = 'heat' | 'rage';
 
 /** 괄호 등 단일 노테이션 이미지 ([, ] Space 등) */
 export type NotationImage = 'bracketl' | 'bracketr' | 'next';

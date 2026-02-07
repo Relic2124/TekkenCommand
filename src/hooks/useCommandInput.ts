@@ -18,9 +18,13 @@ function toHoldNotation(dir: DirectionNotation | null): DirectionNotation | null
   return (base + 'hold') as DirectionNotation;
 }
 
+export type SelectionRange = { start: number; end: number };
+
 export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [cursorIndex, setCursorIndexState] = useState(0);
+  const [selection, setSelectionState] = useState<SelectionRange | null>(null);
+  const selectionRef = useRef<SelectionRange | null>(null);
   const cursorIndexRef = useRef(0);
   const commandsLengthRef = useRef(0);
   const commandsRef = useRef<CommandItem[]>([]);
@@ -45,9 +49,19 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   }, [cursorIndex]);
 
   useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
+
+  useEffect(() => {
     commandsLengthRef.current = commands.length;
     commandsRef.current = commands;
     setCursorIndexState((prev) => Math.min(prev, commands.length));
+    setSelectionState((sel) => {
+      if (!sel) return null;
+      const start = Math.min(sel.start, commands.length);
+      const end = Math.min(sel.end, commands.length);
+      return start < end ? { start, end } : null;
+    });
   }, [commands.length, commands]);
 
   const setCursorIndex = useCallback((value: number | ((prev: number) => number)) => {
@@ -121,6 +135,20 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         return;
       }
 
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyA') {
+        const active = document.activeElement as HTMLElement | null;
+        if (active?.closest?.('.input-area')) {
+          if (isTextMode && active.tagName === 'INPUT') return;
+          event.preventDefault();
+          const len = commandsLengthRef.current;
+          if (len > 0) {
+            setSelectionState({ start: 0, end: len });
+            setCursorIndexState(len);
+          }
+          return;
+        }
+      }
+
       if (code === 'ShiftLeft' || code === 'ShiftRight') {
         if (!event.repeat) addCommand({ type: 'direction', value: 'n' });
         event.preventDefault();
@@ -141,32 +169,48 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (code === 'Backspace') {
-        setCommands((prev) => {
-          const idx = Math.min(cursorIndexRef.current, prev.length);
-          if (idx <= 0) return prev;
-          return [...prev.slice(0, idx - 1), ...prev.slice(idx)];
-        });
-        setCursorIndexState((prev) => (prev > 0 ? prev - 1 : 0));
+        const sel = selectionRef.current;
+        if (sel && sel.start < sel.end) {
+          setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
+          setCursorIndexState(sel.start);
+          setSelectionState(null);
+        } else {
+          setCommands((prev) => {
+            const idx = Math.min(cursorIndexRef.current, prev.length);
+            if (idx <= 0) return prev;
+            return [...prev.slice(0, idx - 1), ...prev.slice(idx)];
+          });
+          setCursorIndexState((prev) => (prev > 0 ? prev - 1 : 0));
+        }
         event.preventDefault();
         return;
       }
 
       if (code === 'Delete') {
-        setCommands((prev) => {
-          const idx = Math.min(cursorIndexRef.current, prev.length);
-          if (idx >= prev.length) return prev;
-          return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-        });
+        const sel = selectionRef.current;
+        if (sel && sel.start < sel.end) {
+          setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
+          setCursorIndexState(sel.start);
+          setSelectionState(null);
+        } else {
+          setCommands((prev) => {
+            const idx = Math.min(cursorIndexRef.current, prev.length);
+            if (idx >= prev.length) return prev;
+            return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+          });
+        }
         event.preventDefault();
         return;
       }
 
       if (code === 'ArrowLeft') {
+        setSelectionState(null);
         setCursorIndexState((prev) => Math.max(0, prev - 1));
         event.preventDefault();
         return;
       }
       if (code === 'ArrowRight') {
+        setSelectionState(null);
         setCursorIndexState((prev) => Math.min(commandsLengthRef.current, prev + 1));
         event.preventDefault();
         return;
@@ -292,6 +336,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           }
           return [...prev.slice(0, at), ...toAdd, ...prev.slice(at)];
         });
+        setSelectionState(null);
         if (didReplaceWithHoldRef.current || replaceHeatWithSmash) {
           cursorIndexRef.current = idx;
           setCursorIndexState(idx);
@@ -307,17 +352,26 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   }, [isTextMode]);
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [handleKeyDown, handleKeyUp]);
 
+  const selectAll = useCallback(() => {
+    const len = commandsLengthRef.current;
+    if (len > 0) {
+      setSelectionState({ start: 0, end: len });
+      setCursorIndexState(len);
+    }
+  }, []);
+
   const clearCommands = useCallback(() => {
     setCommands([]);
     setCursorIndexState(0);
+    setSelectionState(null);
     setCurrentText('');
     setIsTextMode(false);
     prevDirection.current = null;
@@ -353,6 +407,9 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     commands,
     cursorIndex,
     setCursorIndex,
+    selection,
+    setSelection: setSelectionState,
+    selectAll,
     isTextMode,
     currentText,
     addCommand,

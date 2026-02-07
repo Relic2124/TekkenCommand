@@ -93,6 +93,9 @@ export default function App() {
     commands,
     cursorIndex,
     setCursorIndex,
+    selection,
+    setSelection,
+    selectAll,
     isTextMode,
     currentText,
     clearCommands,
@@ -100,6 +103,64 @@ export default function App() {
     finishTextInput,
     updateText,
   } = useCommandInput(keyMapping);
+
+  const dragAnchorStartRef = useRef<number>(0);
+  const dragAnchorEndRef = useRef<number>(0);
+  const isDraggingRef = useRef(false);
+  const didDragRef = useRef(false);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const anchorStart = dragAnchorStartRef.current;
+      const anchorEnd = dragAnchorEndRef.current;
+      let minP: number;
+      let maxP: number;
+      const cmdEl = el?.closest?.('[data-command-index]');
+      const posEl = el?.closest?.('[data-position]');
+      if (cmdEl) {
+        const i = parseInt((cmdEl as HTMLElement).getAttribute('data-command-index') ?? '', 10);
+        if (!Number.isNaN(i)) {
+          minP = i;
+          maxP = i + 1;
+        } else if (posEl) {
+          const p = parseInt((posEl as HTMLElement).getAttribute('data-position') ?? '', 10);
+          if (Number.isNaN(p)) return;
+          minP = maxP = p;
+        } else return;
+      } else if (posEl) {
+        const p = parseInt((posEl as HTMLElement).getAttribute('data-position') ?? '', 10);
+        if (Number.isNaN(p)) return;
+        minP = maxP = p;
+      } else return;
+      const newStart = Math.min(anchorStart, minP);
+      const newEnd = Math.max(anchorEnd, maxP);
+      if (newStart < newEnd) {
+        setSelection({ start: newStart, end: newEnd });
+        setCursorIndex(newEnd);
+        didDragRef.current = true;
+      } else {
+        setSelection(null);
+        setCursorIndex(newStart);
+      }
+    };
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      setTimeout(() => {
+        didDragRef.current = false;
+      }, 0);
+    };
+    document.addEventListener('mousemove', onMouseMove, true);
+    document.addEventListener('mouseup', onMouseUp, true);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove, true);
+      document.removeEventListener('mouseup', onMouseUp, true);
+    };
+  }, [setSelection, setCursorIndex]);
+
+  const hasSelection = selection && selection.start < selection.end;
+  const isCaretVisible = !hasSelection && !isTextMode;
 
   const TEXT_ROW_HEIGHT = 48;
   const PADDING = 4;
@@ -249,18 +310,50 @@ export default function App() {
               <Fragment key={i}>
                 <span
                   className="input-slot"
-                  onClick={() => setCursorIndex(i)}
+                  data-position={i}
                   role="button"
                   tabIndex={-1}
                   aria-label={`커서 위치 ${i + 1}`}
+                  onMouseDown={(e) => {
+                    if (e.button !== 0) return;
+                    dragAnchorStartRef.current = i;
+                    dragAnchorEndRef.current = i;
+                    isDraggingRef.current = true;
+                    setSelection(null);
+                    setCursorIndex(i);
+                  }}
+                  onClick={() => {
+                    if (didDragRef.current) {
+                      didDragRef.current = false;
+                      return;
+                    }
+                    setSelection(null);
+                    setCursorIndex(i);
+                  }}
                 >
-                  {cursorIndex === i && <span className="input-caret">|</span>}
+                  {cursorIndex === i && isCaretVisible && <span className="input-caret">|</span>}
                 </span>
                 {i < commands.length && (
                   <span
-                    className="input-command-wrap"
+                    className={`input-command-wrap${selection && i >= selection.start && i < selection.end ? ' input-command-selected' : ''}`}
+                    data-position={i + 1}
+                    data-command-index={i}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (e.button !== 0) return;
+                      dragAnchorStartRef.current = i;
+                      dragAnchorEndRef.current = i + 1;
+                      isDraggingRef.current = true;
+                      setSelection({ start: i, end: i + 1 });
+                      setCursorIndex(i + 1);
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (didDragRef.current) {
+                        didDragRef.current = false;
+                        return;
+                      }
+                      setSelection({ start: i, end: i + 1 });
                       setCursorIndex(i + 1);
                     }}
                   >
@@ -293,7 +386,7 @@ export default function App() {
                     aria-label="텍스트 입력"
                   />
                 </span>
-                <span className="caret">|</span>"
+                {isCaretVisible ? <span className="caret">|</span> : null}"
               </span>
             ) : null}
           </div>

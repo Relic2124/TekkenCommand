@@ -164,6 +164,15 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.input-command-wrap.input-command-selected {
+  background: rgba(59, 130, 246, 0.35);
+  border-radius: 2px;
+}
+
+.input-command-wrap.input-command-selected:hover {
+  background: rgba(59, 130, 246, 0.45);
+}
+
 .input-slot:hover {
   background: rgba(255, 255, 255, 0.06);
 }

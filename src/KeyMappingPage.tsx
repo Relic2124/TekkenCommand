@@ -1,5 +1,4 @@
 import type { KeyMapping } from './types/index.js';
-import { getNotationImageUrl } from './utils/notationImages.js';
 import { defaultKeyMapping } from './utils/keyMapping.js';
 import { keyCodesToLabel } from './utils/keyMapping.js';
 
@@ -61,19 +60,6 @@ const DIRECTION_LABELS: Record<string, string> = {
   b: '←',
 };
 
-/** 공격 버튼 표기: 1→LP, 2→RP, 3→LK, 4→RK, 1+2→LP+RP 등 */
-function buttonCmdToLabel(cmd: string): string {
-  const map: Record<string, string> = { '1': 'LP', '2': 'RP', '3': 'LK', '4': 'RK' };
-  return cmd.split('+').map((n) => map[n.trim()] ?? n).join('+');
-}
-
-/** 공격 버튼 표 표시 순서 (단일 → 2개 조합 → 3개 → 4개) */
-const BUTTON_ORDER = [
-  '1', '2', '3', '4',
-  '1+2', '3+4', '1+3', '2+4', '1+4', '2+3',
-  '1+2+3', '1+2+4', '1+3+4', '2+3+4', '1+2+3+4',
-] as const;
-
 export function KeyMappingPage({ keyMapping, onMappingChange, onBack }: KeyMappingPageProps) {
   const handleReset = () => {
     onMappingChange(defaultKeyMapping);
@@ -84,6 +70,7 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack }: KeyMappi
     <div className="app keymap-page">
       <header className="header">
         <h1>키 매핑</h1>
+        <p className="key-hint" style={{ fontSize: '1.5rem', marginTop: '1rem' }}>Hello World</p>
         <p className="key-hint">입력 시 사용되는 키 설정입니다.</p>
         <nav className="page-nav">
           <button type="button" className="nav-link" onClick={onBack}>
@@ -98,23 +85,17 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack }: KeyMappi
           <table className="keymap-table">
             <thead>
               <tr>
-                <th colSpan={2} className="keymap-th-merged">커맨드</th>
+                <th>커맨드</th>
                 <th>키</th>
               </tr>
             </thead>
             <tbody>
-              {(['u', 'd', 'f', 'b'] as const).map((key) => {
-                const imgUrl = getNotationImageUrl(key);
-                return (
-                  <tr key={key}>
-                    <td className="keymap-td-img">
-                      {imgUrl ? <img src={imgUrl} alt="" className="keymap-cmd-img" /> : null}
-                    </td>
-                    <td>{DIRECTION_LABELS[key]}</td>
-                    <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(keyMapping.directions[key]))}</td>
-                  </tr>
-                );
-              })}
+              {(['u', 'd', 'f', 'b'] as const).map((key) => (
+                <tr key={key}>
+                  <td>{DIRECTION_LABELS[key]}</td>
+                  <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(keyMapping.directions[key]))}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>
@@ -124,24 +105,17 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack }: KeyMappi
           <table className="keymap-table">
             <thead>
               <tr>
-                <th colSpan={2} className="keymap-th-merged">커맨드</th>
+                <th>커맨드</th>
                 <th>키</th>
               </tr>
             </thead>
             <tbody>
-              {BUTTON_ORDER.map((cmd) => {
-                const codes = keyMapping.buttons[cmd] ?? [];
-                const imgUrl = getNotationImageUrl(cmd);
-                return (
-                  <tr key={cmd}>
-                    <td className="keymap-td-img">
-                      {imgUrl ? <img src={imgUrl} alt="" className="keymap-cmd-img" /> : null}
-                    </td>
-                    <td>{buttonCmdToLabel(cmd)}</td>
-                    <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(codes))}</td>
-                  </tr>
-                );
-              })}
+              {Object.entries(keyMapping.buttons).map(([cmd, codes]) => (
+                <tr key={cmd}>
+                  <td>{cmd}</td>
+                  <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(codes))}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>
@@ -151,26 +125,16 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack }: KeyMappi
           <table className="keymap-table">
             <thead>
               <tr>
-                <th colSpan={2} className="keymap-th-merged">커맨드</th>
+                <th>커맨드</th>
                 <th>키</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="keymap-td-img">
-                  {getNotationImageUrl('heat') ? (
-                    <img src={getNotationImageUrl('heat')!} alt="" className="keymap-cmd-img" />
-                  ) : null}
-                </td>
-                <td>히트 버스트 / 히트 스매시</td>
+                <td>히트 버스트</td>
                 <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(keyMapping.special.heat))}</td>
               </tr>
               <tr>
-                <td className="keymap-td-img">
-                  {getNotationImageUrl('rage') ? (
-                    <img src={getNotationImageUrl('rage')!} alt="" className="keymap-cmd-img" />
-                  ) : null}
-                </td>
                 <td>레이지 아츠</td>
                 <td className="keymap-keys">{keyCodesToLabel(ensureStringArray(keyMapping.special.rage))}</td>
               </tr>
