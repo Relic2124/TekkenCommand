@@ -6,6 +6,7 @@ import {
   findButtonFromKeys,
   findSpecialFromKeys,
 } from '../utils/keyMapping.js';
+import { commandsToCopyText, parsePasteText } from '../utils/commandClipboard.js';
 
 const FPS = 60;
 const FRAME_MS = 1000 / FPS;
@@ -148,12 +149,64 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           return;
         }
       }
-
-      if (code === 'ShiftLeft' || code === 'ShiftRight') {
-        if (!event.repeat) addCommand({ type: 'direction', value: 'n' });
-        event.preventDefault();
-        return;
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyC') {
+        const active = document.activeElement as HTMLElement | null;
+        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
+          const sel = selectionRef.current;
+          const cmds = commandsRef.current;
+          if (cmds.length > 0) {
+            const toCopy = sel && sel.start < sel.end
+              ? cmds.slice(sel.start, sel.end)
+              : cmds;
+            const text = commandsToCopyText(toCopy);
+            if (text) {
+              event.preventDefault();
+              navigator.clipboard.writeText(text);
+            }
+          }
+          return;
+        }
       }
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyX') {
+        const active = document.activeElement as HTMLElement | null;
+        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
+          const sel = selectionRef.current;
+          const cmds = commandsRef.current;
+          if (sel && sel.start < sel.end && cmds.length > 0) {
+            event.preventDefault();
+            const toCopy = cmds.slice(sel.start, sel.end);
+            const text = commandsToCopyText(toCopy);
+            if (text) navigator.clipboard.writeText(text);
+            setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
+            setCursorIndexState(sel.start);
+            setSelectionState(null);
+          }
+          return;
+        }
+      }
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyV') {
+        const active = document.activeElement as HTMLElement | null;
+        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
+          event.preventDefault();
+          navigator.clipboard.readText().then((text) => {
+            const toInsert = parsePasteText(text);
+            if (toInsert.length === 0) return;
+            const sel = selectionRef.current;
+            const idx = cursorIndexRef.current;
+            setCommands((prev) => {
+              const hasSel = sel && sel.start < sel.end;
+              const at = hasSel ? sel.start : Math.min(idx, prev.length);
+              const endAt = hasSel ? sel.end : at;
+              return [...prev.slice(0, at), ...toInsert, ...prev.slice(endAt)];
+            });
+            const newCursor = (sel && sel.start < sel.end ? sel.start : idx) + toInsert.length;
+            setCursorIndexState(newCursor);
+            setSelectionState(null);
+          });
+          return;
+        }
+      }
+
       if (code === 'Space') {
         if (!event.repeat) addCommand({ type: 'notation', value: 'next' });
         event.preventDefault();
@@ -204,14 +257,45 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (code === 'ArrowLeft') {
-        setSelectionState(null);
-        setCursorIndexState((prev) => Math.max(0, prev - 1));
+        if (event.shiftKey) {
+          const cur = cursorIndexRef.current;
+          const newCursor = Math.max(0, cur - 1);
+          const sel = selectionRef.current;
+          if (sel && sel.start < sel.end) {
+            const anchor = sel.start + sel.end - cur;
+            const newStart = Math.min(newCursor, anchor);
+            const newEnd = Math.max(newCursor, anchor);
+            setSelectionState(newStart < newEnd ? { start: newStart, end: newEnd } : null);
+          } else {
+            setSelectionState(newCursor < cur ? { start: newCursor, end: cur } : null);
+          }
+          setCursorIndexState(newCursor);
+        } else {
+          setSelectionState(null);
+          setCursorIndexState((prev) => Math.max(0, prev - 1));
+        }
         event.preventDefault();
         return;
       }
       if (code === 'ArrowRight') {
-        setSelectionState(null);
-        setCursorIndexState((prev) => Math.min(commandsLengthRef.current, prev + 1));
+        if (event.shiftKey) {
+          const len = commandsLengthRef.current;
+          const cur = cursorIndexRef.current;
+          const newCursor = Math.min(len, cur + 1);
+          const sel = selectionRef.current;
+          if (sel && sel.start < sel.end) {
+            const anchor = sel.start + sel.end - cur;
+            const newStart = Math.min(newCursor, anchor);
+            const newEnd = Math.max(newCursor, anchor);
+            setSelectionState(newStart < newEnd ? { start: newStart, end: newEnd } : null);
+          } else {
+            setSelectionState(newCursor > cur ? { start: cur, end: newCursor } : null);
+          }
+          setCursorIndexState(newCursor);
+        } else {
+          setSelectionState(null);
+          setCursorIndexState((prev) => Math.min(commandsLengthRef.current, prev + 1));
+        }
         event.preventDefault();
         return;
       }
@@ -403,6 +487,44 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     []
   );
 
+  const copyToClipboard = useCallback(() => {
+    const sel = selectionRef.current;
+    const cmds = commandsRef.current;
+    if (cmds.length === 0) return;
+    const toCopy = sel && sel.start < sel.end ? cmds.slice(sel.start, sel.end) : cmds;
+    const text = commandsToCopyText(toCopy);
+    if (text) navigator.clipboard.writeText(text);
+  }, []);
+
+  const cutToClipboard = useCallback(() => {
+    const sel = selectionRef.current;
+    const cmds = commandsRef.current;
+    if (!sel || sel.start >= sel.end || cmds.length === 0) return;
+    const toCopy = cmds.slice(sel.start, sel.end);
+    const text = commandsToCopyText(toCopy);
+    if (text) navigator.clipboard.writeText(text);
+    setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
+    setCursorIndexState(sel.start);
+    setSelectionState(null);
+  }, []);
+
+  const pasteFromClipboard = useCallback(async () => {
+    const text = await navigator.clipboard.readText();
+    const toInsert = parsePasteText(text);
+    if (toInsert.length === 0) return;
+    const sel = selectionRef.current;
+    const idx = cursorIndexRef.current;
+    setCommands((prev) => {
+      const hasSel = sel && sel.start < sel.end;
+      const at = hasSel ? sel.start : Math.min(idx, prev.length);
+      const endAt = hasSel ? sel.end : at;
+      return [...prev.slice(0, at), ...toInsert, ...prev.slice(endAt)];
+    });
+    const newCursor = (sel && sel.start < sel.end ? sel.start : idx) + toInsert.length;
+    setCursorIndexState(newCursor);
+    setSelectionState(null);
+  }, []);
+
   return {
     commands,
     cursorIndex,
@@ -410,6 +532,9 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     selection,
     setSelection: setSelectionState,
     selectAll,
+    copyToClipboard,
+    cutToClipboard,
+    pasteFromClipboard,
     isTextMode,
     currentText,
     addCommand,

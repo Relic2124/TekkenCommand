@@ -26,7 +26,7 @@ export const defaultKeyMapping: KeyMapping = {
     d: ['KeyS'],
     f: ['KeyD'],
     b: ['KeyA'],
-    n: [],
+    n: ['KeyF'],
   },
   buttons: {
     '1': ['Numpad4'],
@@ -73,6 +73,7 @@ export function findDirectionFromKeys(
     ['d', dirs.d],
     ['f', dirs.f],
     ['b', dirs.b],
+    ['n', dirs.n],
   ];
   for (const [name, keys] of singles) {
     if (keys.length && setHasAll(pressedKeys, keys)) return name;
