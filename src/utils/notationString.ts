@@ -2,13 +2,13 @@ import type { CommandItem, DirectionNotation, ButtonNotation } from '../types/in
 
 export type InputNotationMode = 'english' | 'japanese';
 
-/** 방향 → 일본 키패드 표기 (7 8 9 / 4 n 6 / 1 2 3), 홀드는 숫자+h */
+/** 방향 → 일본 키패드 표기 (7 8 9 / 4 n 6 / 1 2 3), 홀드는 숫자~ */
 function directionToJapanese(d: DirectionNotation): string {
   const tap: Record<string, string> = {
     db: '1', d: '2', df: '3', b: '4', n: 'n', f: '6', ub: '7', u: '8', uf: '9',
   };
   const hold: Record<string, string> = {
-    dbhold: '1h', dhold: '2h', dfhold: '3h', bhold: '4h', fhold: '6h', ubhold: '7h', uhold: '8h', ufhold: '9h',
+    dbhold: '1~', dhold: '2~', dfhold: '3~', bhold: '4~', fhold: '6~', ubhold: '7~', uhold: '8~', ufhold: '9~',
   };
   return hold[d] ?? tap[d] ?? d;
 }

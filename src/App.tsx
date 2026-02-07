@@ -243,16 +243,14 @@ export default function App() {
                   ref={textInputRef}
                   type="text"
                   className="inline-text-input"
-                  defaultValue=""
-                  key="text-input"
+                  value={currentText}
+                  onChange={(e) => updateText(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.code === 'Enter' && e.key === 'Enter') {
                       e.preventDefault();
                       e.stopPropagation();
-                      const input = e.target as HTMLInputElement;
-                      const value = input.value;
-                      finishTextInput(value);
-                      input.blur();
+                      finishTextInput(currentText);
+                      textInputRef.current?.blur();
                     }
                   }}
                   aria-label="텍스트 입력"
@@ -265,7 +263,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                if (isTextMode) finishTextInput(textInputRef.current?.value ?? '');
+                if (isTextMode) finishTextInput(currentText);
                 else toggleTextMode();
               }}
             >
