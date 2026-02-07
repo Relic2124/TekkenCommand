@@ -239,22 +239,27 @@ export default function App() {
             {isTextMode ? (
               <span className="text-cursor">
                 "
-                <input
-                  ref={textInputRef}
-                  type="text"
-                  className="inline-text-input"
-                  value={currentText}
-                  onChange={(e) => updateText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.code === 'Enter' && e.key === 'Enter') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      finishTextInput(currentText);
-                      textInputRef.current?.blur();
-                    }
-                  }}
-                  aria-label="텍스트 입력"
-                />
+                <span className="inline-text-input-wrap">
+                  <span className="inline-text-input-mirror" aria-hidden="true">
+                    {currentText || '\u00A0'}
+                  </span>
+                  <input
+                    ref={textInputRef}
+                    type="text"
+                    className="inline-text-input"
+                    value={currentText}
+                    onChange={(e) => updateText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.code === 'Enter' && e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        finishTextInput(currentText);
+                        textInputRef.current?.blur();
+                      }
+                    }}
+                    aria-label="텍스트 입력"
+                  />
+                </span>
                 <span className="caret">|</span>"
               </span>
             ) : null}
