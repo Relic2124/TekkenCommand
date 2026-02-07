@@ -32,6 +32,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const framesHeld = useRef<number>(0);
   const prevButton = useRef<string | null>(null);
   const prevSpecial = useRef<'heat' | 'rage' | null>(null);
+  const didReplaceWithHoldRef = useRef(false);
 
   const HOLD_FRAME_THRESHOLD = 10;
 
@@ -235,18 +236,26 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
 
       if (toAdd.length > 0) {
         const idx = cursorIndexRef.current;
-        const onlyHold =
-          toAdd.length === 1 &&
-          toAdd[0].type === 'direction' &&
-          String((toAdd[0] as { value: string }).value).endsWith('hold');
+        didReplaceWithHoldRef.current = false;
+        const holdItem = toAdd.length === 1 && toAdd[0].type === 'direction' ? toAdd[0] as { type: 'direction'; value: string } : null;
+        const onlyHold = holdItem && holdItem.value.endsWith('hold');
+        const holdBase = onlyHold ? holdItem.value.replace(/hold$/, '') : '';
         setCommands((prev) => {
           const at = Math.min(idx, prev.length);
           if (onlyHold && at > 0) {
-            return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+            const prevCmd = prev[at - 1];
+            const prevIsSameDirTap =
+              prevCmd.type === 'direction' &&
+              !(prevCmd.value as string).endsWith('hold') &&
+              (prevCmd.value as string) === holdBase;
+            if (prevIsSameDirTap) {
+              didReplaceWithHoldRef.current = true;
+              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+            }
           }
           return [...prev.slice(0, at), ...toAdd, ...prev.slice(at)];
         });
-        if (onlyHold && idx > 0) {
+        if (didReplaceWithHoldRef.current) {
           cursorIndexRef.current = idx;
           setCursorIndexState(idx);
         } else {
