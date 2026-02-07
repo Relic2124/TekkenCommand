@@ -26,6 +26,9 @@ export function commandsToCopyText(commands: CommandItem[]): string {
       case 'notation':
         if (item.value === 'bracketl') return '[';
         if (item.value === 'bracketr') return ']';
+        if (item.value === 'parenl') return '(';
+        if (item.value === 'parenr') return ')';
+        if (item.value === 'tilde') return '~';
         return 'next';
       case 'text':
         const escaped = (item.value as string).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -92,6 +95,18 @@ export function parsePasteText(text: string): CommandItem[] {
     }
     if (raw === ']') {
       result.push({ type: 'notation', value: 'bracketr' });
+      continue;
+    }
+    if (raw === '(') {
+      result.push({ type: 'notation', value: 'parenl' });
+      continue;
+    }
+    if (raw === ')') {
+      result.push({ type: 'notation', value: 'parenr' });
+      continue;
+    }
+    if (raw === '~') {
+      result.push({ type: 'notation', value: 'tilde' });
       continue;
     }
     if (raw === 'next' || raw === '▶') {

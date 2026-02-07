@@ -63,8 +63,10 @@ function OutputCommand({ item }: { item: CommandItem }) {
   }
   if (item.type === 'notation') {
     const url = getNotationImageUrl(item.value);
-    if (!url) return <span className="output-fallback">{item.value === 'next' ? '▶' : item.value === 'bracketl' ? '[' : ']'}</span>;
-    return <img src={url} alt={item.value === 'next' ? 'next' : item.value === 'bracketl' ? '[' : ']'} className="notation-img" />;
+    const fallbackChar = item.value === 'next' ? '▶' : item.value === 'bracketl' ? '[' : item.value === 'bracketr' ? ']' : item.value === 'parenl' ? '(' : item.value === 'parenr' ? ')' : item.value === 'tilde' ? '~' : '';
+    const altChar = fallbackChar || 'notation';
+    if (!url) return <span className="output-fallback">{fallbackChar}</span>;
+    return <img src={url} alt={altChar} className="notation-img" />;
   }
   const name = commandToImageName(item);
   if (!name) return null;
@@ -74,11 +76,37 @@ function OutputCommand({ item }: { item: CommandItem }) {
 }
 
 type Page = 'main' | 'keymap';
+type Theme = 'light' | 'dark';
+
+const THEME_STORAGE_KEY = 'tekken-theme';
+
+function loadTheme(): Theme {
+  try {
+    const s = localStorage.getItem(THEME_STORAGE_KEY);
+    return s === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
 
 export default function App() {
   const outputRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState<Page>('main');
+  const [theme, setThemeState] = useState<Theme>(loadTheme);
   const [keyMapping, setKeyMappingState] = useState<KeyMapping>(loadKeyMapping);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
+
+  const setTheme = useCallback((next: Theme) => {
+    setThemeState(next);
+  }, []);
 
   const setKeyMapping = useCallback((next: KeyMapping) => {
     setKeyMappingState(next);
@@ -265,6 +293,8 @@ export default function App() {
         keyMapping={keyMapping}
         onMappingChange={setKeyMapping}
         onBack={() => setPage('main')}
+        theme={theme}
+        onThemeChange={setTheme}
       />
     );
   }
@@ -273,10 +303,15 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>철권 8 커맨드 생성기</h1>
-        <p className="key-hint">
-          WASD: 이동 · 넘패드: 공격(4=1, 5=2, 1=3, 2=4, 6=1+2, 3=3+4) · 7=히트버스트 9=레이지아츠 · Enter=텍스트
-        </p>
         <nav className="page-nav">
+          <button
+            type="button"
+            className="theme-toggle-btn"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            title={theme === 'light' ? '라이트 테마로 전환' : '다크 테마로 전환'}
+          >
+            {theme === 'light' ? '☀️ 라이트' : '🌙 다크'}
+          </button>
           <button type="button" className="nav-link" onClick={() => setPage('keymap')}>
             키 매핑
           </button>

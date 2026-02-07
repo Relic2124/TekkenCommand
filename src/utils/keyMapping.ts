@@ -46,15 +46,15 @@ function setHasAll(set: Set<string>, keys: string[]): boolean {
   return keys.every((k) => set.has(k));
 }
 
-/** 대각선 = 위아래+앞뒤 조합. u+b→ub, u+f→uf, d+b→db, d+f→df */
+/** 대각선: 전용 키가 있으면 사용, 없으면 위/아래+앞/뒤 조합 */
 function getDiagonalKeys(
   dirs: KeyMapping['directions']
 ): [DirectionNotation, string[]][] {
   return [
-    ['ub', [...dirs.u, ...dirs.b]],
-    ['uf', [...dirs.u, ...dirs.f]],
-    ['db', [...dirs.d, ...dirs.b]],
-    ['df', [...dirs.d, ...dirs.f]],
+    ['ub', (dirs.ub?.length ? dirs.ub : [...dirs.u, ...dirs.b])],
+    ['uf', (dirs.uf?.length ? dirs.uf : [...dirs.u, ...dirs.f])],
+    ['db', (dirs.db?.length ? dirs.db : [...dirs.d, ...dirs.b])],
+    ['df', (dirs.df?.length ? dirs.df : [...dirs.d, ...dirs.f])],
   ];
 }
 

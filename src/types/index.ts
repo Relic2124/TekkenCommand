@@ -15,8 +15,8 @@ export type ButtonNotation =
 /** 특수: heat burst, heat smash, rage art */
 export type SpecialNotation = 'heat' | 'heatSmash' | 'rage';
 
-/** 괄호 등 단일 노테이션 이미지 ([, ] Space 등) */
-export type NotationImage = 'bracketl' | 'bracketr' | 'next';
+/** 괄호·물결표 등 단일 노테이션 이미지 ([, ], (, ), ~, next 등) */
+export type NotationImage = 'bracketl' | 'bracketr' | 'parenl' | 'parenr' | 'next' | 'tilde';
 
 export type CommandItem =
   | { type: 'direction'; value: DirectionNotation }
@@ -25,7 +25,7 @@ export type CommandItem =
   | { type: 'notation'; value: NotationImage }
   | { type: 'text'; value: string };
 
-/** 키 매핑: 방향은 u,d,f,b만 저장, 대각선(ub,uf,db,df)은 조합으로 계산 */
+/** 키 매핑: 방향 u,d,f,b,n + 선택적 대각선(ub,uf,db,df) 전용 키 */
 export interface KeyMapping {
   directions: {
     u: string[];
@@ -33,6 +33,11 @@ export interface KeyMapping {
     f: string[];
     b: string[];
     n: string[];
+    /** 있으면 해당 키로 대각선 인식, 없으면 위/아래+왼/오 조합으로 계산 */
+    ub?: string[];
+    uf?: string[];
+    db?: string[];
+    df?: string[];
   };
   buttons: Record<string, string[]>;
   special: {

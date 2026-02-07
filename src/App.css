@@ -1,10 +1,24 @@
-.app {
+/* 테마: data-theme은 App에서 document.documentElement에 설정 */
+:root,
+:root[data-theme='dark'] {
   --bg: #0f0f12;
   --panel: #18181c;
   --border: #2a2a30;
   --text: #e4e4e7;
   --muted: #71717a;
   --accent: #f59e0b;
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f4f5;
+  --panel: #ffffff;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --muted: #71717a;
+  --accent: #d97706;
+}
+
+.app {
   font-family: 'Segoe UI', system-ui, sans-serif;
   min-height: 100vh;
   background: var(--bg);
@@ -51,6 +65,21 @@
 }
 
 .nav-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.theme-toggle-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -312,6 +341,23 @@
   margin: 0 auto;
 }
 
+@media (min-width: 720px) {
+  .keymap-page .keymap-content {
+    max-width: 900px;
+  }
+
+  .keymap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .keymap-grid-col {
+    min-width: 0;
+  }
+}
+
 .keymap-section {
   margin-bottom: 2rem;
 }
@@ -329,6 +375,7 @@
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.9rem;
+  overflow: visible;
 }
 
 .keymap-table th,
@@ -336,29 +383,34 @@
   padding: 0.5rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+  vertical-align: middle;
+  overflow: visible;
 }
 
-/* 커맨드 열과 키 열 너비 동일 */
-.keymap-table th:nth-child(2),
-.keymap-table td:nth-child(2){
-  width: 180px;
-  box-sizing: border-box;
+/* 열 너비: 헤더(th)에만 지정 — fixed 레이아웃이라 이 열 전체(본문 포함)가 같은 너비가 됨 */
+.keymap-table th:nth-child(1) {
+  width: 200px;
 }
-.keymap-table th:nth-child(3),
-.keymap-table td:nth-child(3) {
-  width: 150px;
-  box-sizing: border-box;
+.keymap-table th:nth-child(2) {
+  width: 120px;
 }
 
-/* 병합된 커맨드 제목·키 제목 가운데 / 내용은 커맨드 왼쪽, 키 가운데 */
+/* 대각선 할당 버튼이 있는 마지막 행: 아래 선 제거 */
+.keymap-table tbody tr:last-child th,
+.keymap-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 커맨드·키 제목 가운데 / 커맨드 왼쪽, 키 가운데 */
 .keymap-table thead th:nth-child(1),
 .keymap-table thead th:nth-child(2) {
   text-align: center;
 }
-.keymap-table td:nth-child(2) {
+.keymap-table td:nth-child(1) {
   text-align: left;
 }
-.keymap-table td:nth-child(3) {
+.keymap-table td:nth-child(2) {
   text-align: center;
 }
 
@@ -372,26 +424,89 @@
   color: var(--accent);
 }
 
-.keymap-th-img,
-.keymap-td-img {
-  width: 40px;
-  padding-right: 0;
-  text-align: right;
-  vertical-align: middle;
+.keymap-key-btn {
+  font: inherit;
+  font-family: ui-monospace, monospace;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.65rem 0.6rem;
+  cursor: pointer;
+  min-width: 5rem;
+  min-height: 2.25rem;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-/* 1열·2열 사이 간격 제거 (커맨드 셀 왼쪽 패딩 최소화) */
-.keymap-table td:nth-child(2) {
-  padding-left: 0.25rem;
+.keymap-key-btn:hover {
+  border-color: var(--accent);
+  background: rgba(245, 158, 11, 0.08);
 }
 
-.keymap-cmd-img {
-  height: 28px;
+.keymap-key-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 대각선 할당 버튼: 방향 표 아래 별도 영역 */
+.keymap-diagonal-toggle-wrap {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.keymap-diagonal-key-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.keymap-key-cancel-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+
+.keymap-key-cancel-btn:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.keymap-diagonal-toggle-btn {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.keymap-diagonal-toggle-btn:hover {
+  border-color: var(--accent);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+/* 커맨드 셀: [이미지] + 텍스트 한 줄로 */
+.keymap-cmd-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.keymap-cmd-cell .keymap-cmd-img {
+  height: 40px;
   width: auto;
-  display: block;
-  margin-left: auto;
-  margin-right: 0;
+  flex-shrink: 0;
   vertical-align: middle;
+  display: block;
 }
 
 .keymap-actions {
@@ -412,4 +527,44 @@
   background: #222226;
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* 라이트 테마: 하드코딩된 어두운 색 보정 */
+[data-theme='light'] .input-area,
+[data-theme='light'] .output-area {
+  background: #e4e4e7;
+}
+
+[data-theme='light'] .input-command-wrap:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .input-slot:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .output-text-wrap {
+  background: #d4d4d8;
+}
+
+[data-theme='light'] .output-text {
+  color: var(--text);
+}
+
+[data-theme='light'] .input-text,
+[data-theme='light'] .inline-text-input {
+  color: #0e7490;
+}
+
+[data-theme='light'] .input-symbol {
+  color: #a16207;
+}
+
+[data-theme='light'] .input-special {
+  color: #be185d;
+}
+
+[data-theme='light'] .actions button:hover,
+[data-theme='light'] .keymap-reset-btn:hover {
+  background: #e4e4e7;
 }

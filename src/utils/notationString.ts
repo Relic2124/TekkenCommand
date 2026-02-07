@@ -66,6 +66,9 @@ export function commandToNotationString(item: CommandItem, mode: InputNotationMo
     case 'notation':
       if (item.value === 'bracketl') return '[';
       if (item.value === 'bracketr') return ']';
+      if (item.value === 'parenl') return '(';
+      if (item.value === 'parenr') return ')';
+      if (item.value === 'tilde') return '~';
       return ' ▶ ';
     default:
       return '';

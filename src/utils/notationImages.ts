@@ -15,5 +15,8 @@ for (const [path, url] of Object.entries(glob)) {
 }
 
 export function getNotationImageUrl(name: string): string | undefined {
+  if (name === 'tilde') return notationImageUrls['tilde'] ?? notationImageUrls['~'];
+  if (name === 'parenl') return notationImageUrls['parenl'] ?? notationImageUrls['('];
+  if (name === 'parenr') return notationImageUrls['parenr'] ?? notationImageUrls[')'];
   return notationImageUrls[name];
 }

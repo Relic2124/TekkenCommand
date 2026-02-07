@@ -312,6 +312,21 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           event.preventDefault();
           return;
         }
+        if (key === '(') {
+          addCommand({ type: 'notation', value: 'parenl' });
+          event.preventDefault();
+          return;
+        }
+        if (key === ')') {
+          addCommand({ type: 'notation', value: 'parenr' });
+          event.preventDefault();
+          return;
+        }
+        if (key === '~' || (code === 'Backquote' && event.shiftKey)) {
+          addCommand({ type: 'notation', value: 'tilde' });
+          event.preventDefault();
+          return;
+        }
       }
     },
     [isTextMode, toggleTextMode, addCommand]
