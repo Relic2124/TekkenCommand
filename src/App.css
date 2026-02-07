@@ -114,8 +114,12 @@
 }
 
 .input-area {
-  cursor: text;
+  cursor: default; /* I자 커서 제거, 만든 커서(|)만 보이게 */
   gap: calc(4px * 0.66); /* 커맨드 사이 간격 0.66 비율 */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .input-slot {
@@ -124,12 +128,12 @@
   min-width: 8px;
   min-height: 1.2em;
   padding: 0 2px;
-  cursor: text;
+  cursor: default;
   border-radius: 2px;
 }
 
 .input-command-wrap {
-  cursor: text;
+  cursor: default;
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -247,5 +251,4 @@
   padding: 0 2px;
   min-width: 8rem;
   outline: none;
-  caret-color: transparent;
 }
