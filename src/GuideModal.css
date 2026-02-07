@@ -118,6 +118,14 @@
   margin-bottom: 0;
 }
 
+.guide-section kbd {
+  padding: 0.15em 0.4em;
+  font-size: 0.9em;
+  background: var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+}
+
 .guide-keys-table {
   width: 100%;
   border-collapse: collapse;
@@ -141,8 +149,8 @@
 }
 
 .guide-example-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
@@ -163,5 +171,4 @@
   object-fit: contain;
   background: var(--bg);
   border-radius: 8px;
-  border: 1px solid var(--border);
 }

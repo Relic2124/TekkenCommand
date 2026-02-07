@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { defaultKeyMapping, keyCodeToLabel } from './utils/keyMapping.js';
 import guideInputGif from './guide_images/guide_input.gif';
 import guideOutputGif from './guide_images/guide_output.gif';
@@ -7,13 +7,18 @@ import './GuideModal.css';
 type GuideSection = 'input' | 'keys' | 'example';
 
 const SECTIONS: { id: GuideSection; title: string }[] = [
-  { id: 'input', title: '1. 입력 방법' },
-  { id: 'keys', title: '2. 기본 키 설정' },
-  { id: 'example', title: '3. 사용 예제' },
+  { id: 'input', title: '입력 방법' },
+  { id: 'keys', title: '기본 키 설정' },
+  { id: 'example', title: '사용 예제' },
 ];
 
 export function GuideModal({ onClose }: { onClose: () => void }) {
   const [openId, setOpenId] = useState<GuideSection | null>('input');
+  const [exampleLoadKey, setExampleLoadKey] = useState(0);
+
+  useEffect(() => {
+    if (openId === 'example') setExampleLoadKey((k) => k + 1);
+  }, [openId]);
 
   return (
     <div className="guide-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="가이드">
@@ -40,7 +45,12 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
                 <div className="guide-accordion-body">
                   {id === 'input' && <GuideInputSection />}
                   {id === 'keys' && <GuideKeysSection />}
-                  {id === 'example' && <GuideExampleSection />}
+                  {id === 'example' && (
+                    <GuideExampleSection
+                      key={exampleLoadKey}
+                      loadKey={exampleLoadKey}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -54,11 +64,15 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
 function GuideInputSection() {
   return (
     <div className="guide-section guide-input">
+      <p>기본적으로 철권에서 입력하는 방식과 동일하게 입력합니다.</p>
       <p>철권과 동일하게 <strong>60프레임 단위</strong>로 입력을 받습니다.</p>
-      <p>이동 커맨드는 <strong>10프레임 이상 유지</strong>하면 입력됩니다.</p>
+      <p>홀드 입력은 이동 커맨드를 <strong>10프레임 이상 유지</strong>하면 입력됩니다.</p>
       <p>
-        표기에서 <strong>Korean</strong>은 1·2·3·4, LP·RP·LK·RK 등으로,{' '}
-        <strong>English</strong>는 u·d·f·b·1·2·3·4 등으로 입력 표기를 바꿉니다.
+        표기 설정에서 <strong>Korean</strong>은 1·2·3·4·n·6·7·8·9, LP·RP·LK·RK 등으로,{' '}
+        <strong>English</strong>는 u·d·f·b·1·2·3·4 등으로 입력 표기합니다.
+      </p>
+      <p>
+        <strong>텍스트 입력</strong>: <kbd>Enter</kbd>를 누르면 텍스트 입력 모드로 전환됩니다. 적을 내용(예: 토네이도, 카운터 등)을 입력한 뒤 다시 <kbd>Enter</kbd>를 누르면 커서 위치에 삽입됩니다.
       </p>
     </div>
   );
@@ -70,15 +84,22 @@ function GuideKeysSection() {
   const s = defaultKeyMapping.special;
 
   const dirRows = [
-    { label: '위(u)', codes: d.u },
-    { label: '아래(d)', codes: d.d },
-    { label: '앞(f)', codes: d.f },
-    { label: '뒤(b)', codes: d.b },
-    { label: '중립(n)', codes: d.n },
+    { label: '↑', codes: d.u },
+    { label: '↓', codes: d.d },
+    { label: '→', codes: d.f },
+    { label: '←', codes: d.b },
+    { label: 'n', codes: d.n },
   ];
-  const buttonRows = Object.entries(b).map(([cmd, codes]) => ({ cmd, codes }));
+  const buttonRows = [
+    { label: 'LP', codes: b['1'] },
+    { label: 'RP', codes: b['2'] },
+    { label: 'LK', codes: b['3'] },
+    { label: 'RK', codes: b['4'] },
+    { label: 'AP', codes: b['1+2'] },
+    { label: 'AK', codes: b['3+4'] },
+  ]
   const specialRows = [
-    { label: '히트 버스트', codes: s.heat },
+    { label: '히트 버스트/히트 스매시', codes: s.heat },
     { label: '레이지 아츠', codes: s.rage },
   ];
 
@@ -94,19 +115,19 @@ function GuideKeysSection() {
         <tbody>
           {dirRows.map(({ label, codes }) => (
             <tr key={label}>
-              <td>방향 · {label}</td>
+              <td>{label}</td>
               <td>{codes.map(keyCodeToLabel).join(', ')}</td>
             </tr>
           ))}
-          {buttonRows.map(({ cmd, codes }) => (
-            <tr key={cmd}>
-              <td>버튼 · {cmd}</td>
+          {buttonRows.map(({ label, codes }) => (
+            <tr key={label}>
+              <td>{label}</td>
               <td>{codes.map(keyCodeToLabel).join(', ')}</td>
             </tr>
           ))}
           {specialRows.map(({ label, codes }) => (
             <tr key={label}>
-              <td>특수 · {label}</td>
+              <td>{label}</td>
               <td>{codes.map(keyCodeToLabel).join(', ')}</td>
             </tr>
           ))}
@@ -116,17 +137,20 @@ function GuideKeysSection() {
   );
 }
 
-function GuideExampleSection() {
+function GuideExampleSection({ loadKey }: { loadKey: number }) {
+  const sep = guideInputGif.includes('?') ? '&' : '?';
+  const inputSrc = `${guideInputGif}${sep}t=${loadKey}`;
+  const outputSrc = `${guideOutputGif}${sep}t=${loadKey}`;
   return (
     <div className="guide-section guide-example">
       <div className="guide-example-row">
         <div className="guide-example-cell">
           <span className="guide-example-label">입력</span>
-          <img src={guideInputGif} alt="입력 예제" className="guide-example-gif" />
+          <img src={inputSrc} alt="입력 예제" className="guide-example-gif" />
         </div>
         <div className="guide-example-cell">
           <span className="guide-example-label">출력</span>
-          <img src={guideOutputGif} alt="출력 예제" className="guide-example-gif" />
+          <img src={outputSrc} alt="출력 예제" className="guide-example-gif" />
         </div>
       </div>
     </div>
