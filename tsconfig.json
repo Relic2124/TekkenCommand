@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "jsx" : "react-jsx",
+    "jsxImportSource": "react",
+    "module": "nodenext",
+    "target": "ESNext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  }
+}
