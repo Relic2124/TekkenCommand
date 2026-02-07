@@ -33,6 +33,28 @@
   margin: 0;
 }
 
+.page-nav {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.nav-link {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -273,4 +295,112 @@
   font: inherit;
   padding: 0 2px;
   outline: none;
+}
+
+/* 키매핑 페이지 */
+.keymap-page .keymap-content {
+  max-width: 470px;
+  margin: 0 auto;
+}
+
+.keymap-section {
+  margin-bottom: 2rem;
+}
+
+.keymap-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 0.75rem 0;
+  text-align: center;
+}
+
+.keymap-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.keymap-table th,
+.keymap-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 커맨드 열과 키 열 너비 동일 */
+.keymap-table th:nth-child(2),
+.keymap-table td:nth-child(2){
+  width: 180px;
+  box-sizing: border-box;
+}
+.keymap-table th:nth-child(3),
+.keymap-table td:nth-child(3) {
+  width: 150px;
+  box-sizing: border-box;
+}
+
+/* 병합된 커맨드 제목·키 제목 가운데 / 내용은 커맨드 왼쪽, 키 가운데 */
+.keymap-table thead th:nth-child(1),
+.keymap-table thead th:nth-child(2) {
+  text-align: center;
+}
+.keymap-table td:nth-child(2) {
+  text-align: left;
+}
+.keymap-table td:nth-child(3) {
+  text-align: center;
+}
+
+.keymap-table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.keymap-keys {
+  font-family: ui-monospace, monospace;
+  color: var(--accent);
+}
+
+.keymap-th-img,
+.keymap-td-img {
+  width: 40px;
+  padding-right: 0;
+  text-align: right;
+  vertical-align: middle;
+}
+
+/* 1열·2열 사이 간격 제거 (커맨드 셀 왼쪽 패딩 최소화) */
+.keymap-table td:nth-child(2) {
+  padding-left: 0.25rem;
+}
+
+.keymap-cmd-img {
+  height: 28px;
+  width: auto;
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
+  vertical-align: middle;
+}
+
+.keymap-actions {
+  margin-top: 2rem;
+}
+
+.keymap-reset-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.keymap-reset-btn:hover {
+  background: #222226;
+  border-color: var(--accent);
+  color: var(--accent);
 }

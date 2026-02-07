@@ -1,9 +1,9 @@
 import type { CommandItem, DirectionNotation, ButtonNotation } from '../types/index.js';
 
-export type InputNotationMode = 'english' | 'japanese';
+export type InputNotationMode = 'english' | 'korean';
 
-/** 방향 → 일본 키패드 표기 (7 8 9 / 4 n 6 / 1 2 3), 홀드는 숫자~ */
-function directionToJapanese(d: DirectionNotation): string {
+/** 방향 → 한국(키패드) 표기 (7 8 9 / 4 n 6 / 1 2 3), 홀드는 숫자~ */
+function directionToKorean(d: DirectionNotation): string {
   const tap: Record<string, string> = {
     db: '1', d: '2', df: '3', b: '4', n: 'n', f: '6', ub: '7', u: '8', uf: '9',
   };
@@ -13,8 +13,8 @@ function directionToJapanese(d: DirectionNotation): string {
   return hold[d] ?? tap[d] ?? d;
 }
 
-/** 버튼 → 일본 표기 LP, RP, LK, RK, AP, AK 및 조합 */
-function buttonToJapanese(b: ButtonNotation): string {
+/** 버튼 → 한국 표기 LP, RP, LK, RK, AP, AK 및 조합 */
+function buttonToKorean(b: ButtonNotation): string {
   const map: Record<string, string> = {
     '1': 'LP', '2': 'RP', '3': 'LK', '4': 'RK',
     '1+2': 'AP', '3+4': 'AK',
@@ -27,12 +27,12 @@ function buttonToJapanese(b: ButtonNotation): string {
 
 /**
  * 커맨드를 입력창 표기 문자열로 변환
- * @param mode 'english' = 영어권 표기(f,d/f,1+2), 'japanese' = 일본 표기(키패드+LP/RP/AP/LK/RK/AK)
+ * @param mode 'english' = 영어권 표기(f,d/f,1+2), 'korean' = 한국 표기(키패드+LP/RP/AP/LK/RK/AK)
  */
 export function commandToNotationString(item: CommandItem, mode: InputNotationMode = 'english'): string {
   switch (item.type) {
     case 'direction': {
-      if (mode === 'japanese') return directionToJapanese(item.value);
+      if (mode === 'korean') return directionToKorean(item.value);
       const d = item.value;
       if (d === 'n') return 'N';
       if (d === 'ub') return 'u/b';
@@ -50,9 +50,12 @@ export function commandToNotationString(item: CommandItem, mode: InputNotationMo
       return d;
     }
     case 'button':
-      return mode === 'japanese' ? buttonToJapanese(item.value) : item.value;
+      return mode === 'korean' ? buttonToKorean(item.value) : item.value;
     case 'special':
-      return item.value === 'heat' ? 'H.' : 'R.';
+      if (mode === 'korean') {
+        return item.value === 'heat' ? '히트 버스트' : item.value === 'heatSmash' ? '히트 스매시' : '레이지 아츠';
+      }
+      return item.value === 'heat' ? 'H.' : item.value === 'heatSmash' ? 'HS.' : 'R.';
     case 'text':
       return `[${item.value}]`;
     case 'notation':

@@ -23,6 +23,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const [cursorIndex, setCursorIndexState] = useState(0);
   const cursorIndexRef = useRef(0);
   const commandsLengthRef = useRef(0);
+  const commandsRef = useRef<CommandItem[]>([]);
   const [isTextMode, setIsTextMode] = useState(false);
   const [currentText, setCurrentText] = useState('');
   const pressedKeys = useRef<Set<string>>(new Set());
@@ -33,8 +34,11 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const prevButton = useRef<string | null>(null);
   const prevSpecial = useRef<'heat' | 'rage' | null>(null);
   const didReplaceWithHoldRef = useRef(false);
+  const didReplaceHeatWithSmashRef = useRef(false);
+  const lastHeatPressTimeRef = useRef(0);
 
   const HOLD_FRAME_THRESHOLD = 10;
+  const HEAT_DOUBLE_PRESS_MS = 400;
 
   useEffect(() => {
     cursorIndexRef.current = cursorIndex;
@@ -42,8 +46,9 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
 
   useEffect(() => {
     commandsLengthRef.current = commands.length;
+    commandsRef.current = commands;
     setCursorIndexState((prev) => Math.min(prev, commands.length));
-  }, [commands.length]);
+  }, [commands.length, commands]);
 
   const setCursorIndex = useCallback((value: number | ((prev: number) => number)) => {
     setCursorIndexState((prev) => {
@@ -231,17 +236,49 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
 
       if (special !== prevSpecial.current) {
         prevSpecial.current = special;
-        if (special) toAdd.push({ type: 'special', value: special });
+        if (special) {
+          if (special === 'heat') {
+            const now = Date.now();
+            const idx = cursorIndexRef.current;
+            const prevCmd = idx > 0 ? commandsRef.current[idx - 1] : null;
+            const isDoublePress =
+              lastHeatPressTimeRef.current > 0 &&
+              now - lastHeatPressTimeRef.current < HEAT_DOUBLE_PRESS_MS;
+            const willReplaceHeatWithSmash =
+              isDoublePress &&
+              prevCmd?.type === 'special' &&
+              prevCmd.value === 'heat';
+            toAdd.push({
+              type: 'special',
+              value: isDoublePress ? 'heatSmash' : 'heat',
+            });
+            didReplaceHeatWithSmashRef.current = !!willReplaceHeatWithSmash;
+            lastHeatPressTimeRef.current = willReplaceHeatWithSmash ? 0 : now;
+          } else {
+            toAdd.push({ type: 'special', value: special });
+          }
+        }
       }
 
       if (toAdd.length > 0) {
         const idx = cursorIndexRef.current;
         didReplaceWithHoldRef.current = false;
+        const replaceHeatWithSmash =
+          didReplaceHeatWithSmashRef.current &&
+          toAdd.length === 1 &&
+          toAdd[0].type === 'special' &&
+          toAdd[0].value === 'heatSmash';
         const holdItem = toAdd.length === 1 && toAdd[0].type === 'direction' ? toAdd[0] as { type: 'direction'; value: string } : null;
         const onlyHold = holdItem && holdItem.value.endsWith('hold');
         const holdBase = onlyHold ? holdItem.value.replace(/hold$/, '') : '';
         setCommands((prev) => {
           const at = Math.min(idx, prev.length);
+          if (replaceHeatWithSmash && at > 0) {
+            const p = prev[at - 1];
+            if (p.type === 'special' && p.value === 'heat') {
+              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+            }
+          }
           if (onlyHold && at > 0) {
             const prevCmd = prev[at - 1];
             const prevIsSameDirTap =
@@ -255,7 +292,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           }
           return [...prev.slice(0, at), ...toAdd, ...prev.slice(at)];
         });
-        if (didReplaceWithHoldRef.current) {
+        if (didReplaceWithHoldRef.current || replaceHeatWithSmash) {
           cursorIndexRef.current = idx;
           setCursorIndexState(idx);
         } else {

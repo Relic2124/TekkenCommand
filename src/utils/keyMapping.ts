@@ -1,5 +1,19 @@
 import type { KeyMapping, DirectionNotation, ButtonNotation } from '../types/index.js';
 
+/** 키 코드를 읽기 쉬운 이름으로 (KeyW → W, Numpad4 → Num 4) */
+export function keyCodeToLabel(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return 'Num ' + code.slice(6);
+  if (code.startsWith('Arrow')) return code.slice(5) + ' 화살표';
+  return code;
+}
+
+/** 키 코드 배열을 쉼표 구분 문자열로 */
+export function keyCodesToLabel(codes: string[]): string {
+  return codes.length ? codes.map(keyCodeToLabel).join(' + ') : '—';
+}
+
 /**
  * README 기준 기본 키 매핑
  * w-u, a-b, s-d, d-f
@@ -12,10 +26,6 @@ export const defaultKeyMapping: KeyMapping = {
     d: ['KeyS'],
     f: ['KeyD'],
     b: ['KeyA'],
-    ub: ['KeyW', 'KeyA'],
-    uf: ['KeyW', 'KeyD'],
-    db: ['KeyS', 'KeyA'],
-    df: ['KeyS', 'KeyD'],
     n: [],
   },
   buttons: {
@@ -24,7 +34,16 @@ export const defaultKeyMapping: KeyMapping = {
     '3': ['Numpad1'],
     '4': ['Numpad2'],
     '1+2': ['Numpad6'],
+    '1+3': [],
+    '1+4': [],
+    '2+3': [],
+    '2+4': [],
     '3+4': ['Numpad3'],
+    '1+2+3': [],
+    '1+2+4': [],
+    '1+3+4': [],
+    '2+3+4': [],
+    '1+2+3+4': [],
   },
   special: {
     heat: ['Numpad7'], // 2+3 동시도 나중에 처리
@@ -36,29 +55,36 @@ function setHasAll(set: Set<string>, keys: string[]): boolean {
   return keys.every((k) => set.has(k));
 }
 
+/** 대각선 = 위아래+앞뒤 조합. u+b→ub, u+f→uf, d+b→db, d+f→df */
+function getDiagonalKeys(
+  dirs: KeyMapping['directions']
+): [DirectionNotation, string[]][] {
+  return [
+    ['ub', [...dirs.u, ...dirs.b]],
+    ['uf', [...dirs.u, ...dirs.f]],
+    ['db', [...dirs.d, ...dirs.b]],
+    ['df', [...dirs.d, ...dirs.f]],
+  ];
+}
+
 /** 눌린 키들로부터 현재 방향(대각선 우선) 반환 */
 export function findDirectionFromKeys(
   pressedKeys: Set<string>,
   mapping: KeyMapping
 ): DirectionNotation | null {
   const dirs = mapping.directions;
-  const diagonals: [keyof typeof dirs, string[]][] = [
-    ['ub', dirs.ub],
-    ['uf', dirs.uf],
-    ['db', dirs.db],
-    ['df', dirs.df],
-  ];
+  const diagonals = getDiagonalKeys(dirs);
   for (const [name, keys] of diagonals) {
-    if (keys.length && setHasAll(pressedKeys, keys)) return name as DirectionNotation;
+    if (keys.length && setHasAll(pressedKeys, keys)) return name;
   }
-  const singles: [keyof typeof dirs, string[]][] = [
+  const singles: [DirectionNotation, string[]][] = [
     ['u', dirs.u],
     ['d', dirs.d],
     ['f', dirs.f],
     ['b', dirs.b],
   ];
   for (const [name, keys] of singles) {
-    if (keys.length && setHasAll(pressedKeys, keys)) return name as DirectionNotation;
+    if (keys.length && setHasAll(pressedKeys, keys)) return name;
   }
   return null;
 }

@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, Fragment, useState } from 'react';
 import { useCommandInput } from './hooks/useCommandInput.js';
-import type { CommandItem } from './types/index.js';
+import type { CommandItem, KeyMapping } from './types/index.js';
+import { KeyMappingPage, loadKeyMapping, saveKeyMapping } from './KeyMappingPage.js';
 import { getNotationImageUrl } from './utils/notationImages.js';
 import { commandToNotationString, type InputNotationMode } from './utils/notationString.js';
 import './App.css';
@@ -53,6 +54,13 @@ function OutputCommand({ item }: { item: CommandItem }) {
       </span>
     );
   }
+  if (item.type === 'special' && item.value === 'heatSmash') {
+    return (
+      <span className="output-text-wrap">
+        <span className="output-text">히트 스매시</span>
+      </span>
+    );
+  }
   if (item.type === 'notation') {
     const url = getNotationImageUrl(item.value);
     if (!url) return <span className="output-fallback">{item.value === 'next' ? '▶' : item.value === 'bracketl' ? '[' : ']'}</span>;
@@ -65,8 +73,22 @@ function OutputCommand({ item }: { item: CommandItem }) {
   return <img src={url} alt={name} className="notation-img" />;
 }
 
+type Page = 'main' | 'keymap';
+
 export default function App() {
   const outputRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState<Page>('main');
+  const [keyMapping, setKeyMappingState] = useState<KeyMapping>(loadKeyMapping);
+
+  const setKeyMapping = useCallback((next: KeyMapping) => {
+    setKeyMappingState(next);
+    saveKeyMapping(next);
+  }, []);
+
+  type DownloadBg = 'transparent' | 'black' | 'white' | 'dark';
+  const [downloadBg, setDownloadBg] = useState<DownloadBg>('transparent');
+  const [inputNotationMode, setInputNotationMode] = useState<InputNotationMode>('korean');
+
   const {
     commands,
     cursorIndex,
@@ -77,11 +99,7 @@ export default function App() {
     toggleTextMode,
     finishTextInput,
     updateText,
-  } = useCommandInput();
-
-  type DownloadBg = 'transparent' | 'black' | 'white' | 'dark';
-  const [downloadBg, setDownloadBg] = useState<DownloadBg>('transparent');
-  const [inputNotationMode, setInputNotationMode] = useState<InputNotationMode>('japanese');
+  } = useCommandInput(keyMapping);
 
   const TEXT_ROW_HEIGHT = 48;
   const PADDING = 4;
@@ -180,6 +198,16 @@ export default function App() {
     if (isTextMode) textInputRef.current?.focus();
   }, [isTextMode]);
 
+  if (page === 'keymap') {
+    return (
+      <KeyMappingPage
+        keyMapping={keyMapping}
+        onMappingChange={setKeyMapping}
+        onBack={() => setPage('main')}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <header className="header">
@@ -187,6 +215,11 @@ export default function App() {
         <p className="key-hint">
           WASD: 이동 · 넘패드: 공격(4=1, 5=2, 1=3, 2=4, 6=1+2, 3=3+4) · 7=히트버스트 9=레이지아츠 · Enter=텍스트
         </p>
+        <nav className="page-nav">
+          <button type="button" className="nav-link" onClick={() => setPage('keymap')}>
+            키 매핑
+          </button>
+        </nav>
       </header>
 
       <div className="panels">
@@ -197,10 +230,10 @@ export default function App() {
               <span className="input-mode-label">표기:</span>
               <button
                 type="button"
-                className={inputNotationMode === 'japanese' ? 'input-mode-btn active' : 'input-mode-btn'}
-                onClick={() => setInputNotationMode('japanese')}
+                className={inputNotationMode === 'korean' ? 'input-mode-btn active' : 'input-mode-btn'}
+                onClick={() => setInputNotationMode('korean')}
               >
-                Japanese
+                Korean
               </button>
               <button
                 type="button"

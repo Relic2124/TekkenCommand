@@ -12,8 +12,8 @@ export type ButtonNotation =
   | '1+2' | '1+3' | '1+4' | '2+3' | '2+4' | '3+4'
   | '1+2+3' | '1+2+4' | '1+3+4' | '2+3+4' | '1+2+3+4';
 
-/** 특수: heat burst, rage art */
-export type SpecialNotation = 'heat' | 'rage';
+/** 특수: heat burst, heat smash(히트키 토글), rage art */
+export type SpecialNotation = 'heat' | 'heatSmash' | 'rage';
 
 /** 괄호 등 단일 노테이션 이미지 ([, ] Space 등) */
 export type NotationImage = 'bracketl' | 'bracketr' | 'next';
@@ -25,22 +25,18 @@ export type CommandItem =
   | { type: 'notation'; value: NotationImage }
   | { type: 'text'; value: string };
 
-/** 키 매핑: README 기준 WASD + 넘패드 */
+/** 키 매핑: 방향은 u,d,f,b만 저장, 대각선(ub,uf,db,df)은 조합으로 계산 */
 export interface KeyMapping {
   directions: {
     u: string[];
     d: string[];
     f: string[];
     b: string[];
-    ub: string[];
-    uf: string[];
-    db: string[];
-    df: string[];
     n: string[];
   };
   buttons: Record<string, string[]>;
   special: {
-    heat: string[];   // 2+3 or Numpad7
-    rage: string[];  // df+1+2 or Numpad9
+    heat: string[];
+    rage: string[];
   };
 }
