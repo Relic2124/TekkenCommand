@@ -20,6 +20,17 @@ export function GuideModal({ onClose }: { onClose: () => void }) {
     if (openId === 'example') setExampleLoadKey((k) => k + 1);
   }, [openId]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
   return (
     <div className="guide-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="가이드">
       <div className="guide-modal" onClick={(e) => e.stopPropagation()}>
