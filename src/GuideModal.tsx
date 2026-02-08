@@ -78,8 +78,9 @@ function GuideInputSection() {
       <p>기본적으로 철권에서 입력하는 방식과 동일하게 입력합니다.</p>
       <p>철권과 동일하게 <strong>60프레임 단위</strong>로 입력을 받습니다.</p>
       <p>홀드 입력은 이동 커맨드를 <strong>10프레임 이상 유지</strong>하면 입력됩니다.</p>
+      <p>히트 버스트 키를 두 번 누르면 히트 스매시가 입력됩니다.</p>
       <p>
-        표기 설정에서 <strong>Korean</strong>은 1·2·3·4·n·6·7·8·9, LP·RP·LK·RK 등으로,{' '}
+        표기 설정에서 <strong>Korean</strong>은 1·2·3·4·n·6·7·8·9·LP·RP·LK·RK 등으로,{' '}
         <strong>English</strong>는 u·d·f·b·1·2·3·4 등으로 입력 표기합니다.
       </p>
       <p>
