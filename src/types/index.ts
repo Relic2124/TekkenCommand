@@ -15,8 +15,8 @@ export type ButtonNotation =
 /** 특수: heat burst, heat smash, rage art */
 export type SpecialNotation = 'heat' | 'heatSmash' | 'rage';
 
-/** 괄호·물결표 등 단일 노테이션 이미지 ([, ], (, ), ~, next 등) */
-export type NotationImage = 'bracketl' | 'bracketr' | 'parenl' | 'parenr' | 'next' | 'tilde';
+/** 괄호·물결표·줄바꿈 등 단일 노테이션 ([, ], (, ), ~, next, linebreak) */
+export type NotationImage = 'bracketl' | 'bracketr' | 'parenl' | 'parenr' | 'next' | 'tilde' | 'linebreak';
 
 export type CommandItem =
   | { type: 'direction'; value: DirectionNotation }

@@ -61,6 +61,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     setCursorIndexState((prev) => Math.min(prev, commands.length));
     setSelectionState((sel) => {
       if (!sel) return null;
+      if (selectionRef.current === null) return null; /* 방금 선택 해제된 경우 유지 */
       const start = Math.min(sel.start, commands.length);
       const end = Math.min(sel.end, commands.length);
       return start < end ? { start, end } : null;
@@ -81,11 +82,17 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   }, [customMapping]);
 
   const insertCommandAtCursor = useCallback((item: CommandItem) => {
+    const sel = selectionRef.current;
+    const hasSel = sel && sel.start < sel.end;
+    if (hasSel) selectionRef.current = null;
     setCommands((prev) => {
-      const idx = Math.min(cursorIndexRef.current, prev.length);
-      return [...prev.slice(0, idx), item, ...prev.slice(idx)];
+      const at = hasSel ? sel!.start : Math.min(cursorIndexRef.current, prev.length);
+      const endAt = hasSel ? sel!.end : at;
+      return [...prev.slice(0, at), item, ...prev.slice(endAt)];
     });
-    setCursorIndexState((prev) => prev + 1);
+    const nextCursor = hasSel ? sel!.start + 1 : cursorIndexRef.current + 1;
+    setCursorIndexState(nextCursor);
+    if (hasSel) setSelectionState(null);
   }, []);
 
   const addCommand = insertCommandAtCursor;
@@ -334,6 +341,11 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
           event.preventDefault();
           return;
         }
+        if (code === 'Backslash' || key === '\\') {
+          addCommand({ type: 'notation', value: 'linebreak' });
+          event.preventDefault();
+          return;
+        }
       }
     },
     [isTextMode, toggleTextMode, addCommand]
@@ -411,6 +423,9 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (toAdd.length > 0) {
+        const sel = selectionRef.current;
+        const hasSel = sel && sel.start < sel.end;
+        if (hasSel) selectionRef.current = null;
         const idx = cursorIndexRef.current;
         didReplaceWithHoldRef.current = false;
         const replaceHeatWithSmash =
@@ -422,11 +437,12 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         const onlyHold = holdItem && holdItem.value.endsWith('hold');
         const holdBase = onlyHold ? holdItem.value.replace(/hold$/, '') : '';
         setCommands((prev) => {
-          const at = Math.min(idx, prev.length);
+          const at = hasSel ? sel!.start : Math.min(idx, prev.length);
+          const endAt = hasSel ? sel!.end : at;
           if (replaceHeatWithSmash && at > 0) {
             const p = prev[at - 1];
             if (p.type === 'special' && p.value === 'heat') {
-              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(endAt)];
             }
           }
           if (onlyHold && at > 0) {
@@ -437,18 +453,22 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
               (prevCmd.value as string) === holdBase;
             if (prevIsSameDirTap) {
               didReplaceWithHoldRef.current = true;
-              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(at)];
+              return [...prev.slice(0, at - 1), toAdd[0], ...prev.slice(endAt)];
             }
           }
-          return [...prev.slice(0, at), ...toAdd, ...prev.slice(at)];
+          return [...prev.slice(0, at), ...toAdd, ...prev.slice(endAt)];
         });
         setSelectionState(null);
         if (didReplaceWithHoldRef.current || replaceHeatWithSmash) {
-          cursorIndexRef.current = idx;
-          setCursorIndexState(idx);
+          const insertAt = hasSel ? sel!.start : idx;
+          cursorIndexRef.current = insertAt;
+          setCursorIndexState(insertAt);
         } else {
-          cursorIndexRef.current = idx + toAdd.length;
-          setCursorIndexState(cursorIndexRef.current);
+          const nextCursor = hasSel
+            ? sel!.start + toAdd.length
+            : Math.min(idx, commandsRef.current.length) + toAdd.length;
+          cursorIndexRef.current = nextCursor;
+          setCursorIndexState(nextCursor);
         }
       }
     };

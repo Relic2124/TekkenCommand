@@ -69,6 +69,7 @@ export function commandToNotationString(item: CommandItem, mode: InputNotationMo
       if (item.value === 'parenl') return '(';
       if (item.value === 'parenr') return ')';
       if (item.value === 'tilde') return '~';
+      if (item.value === 'linebreak') return '↵';
       return ' ▶ ';
     default:
       return '';

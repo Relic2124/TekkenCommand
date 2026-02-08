@@ -29,6 +29,7 @@ export function commandsToCopyText(commands: CommandItem[]): string {
         if (item.value === 'parenl') return '(';
         if (item.value === 'parenr') return ')';
         if (item.value === 'tilde') return '~';
+        if (item.value === 'linebreak') return '↵';
         return 'next';
       case 'text':
         const escaped = (item.value as string).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -80,7 +81,7 @@ function tokenize(str: string): Token[] {
   return tokens;
 }
 
-/** 클립보드 텍스트를 파싱해 CommandItem[] 반환 */
+/** 클립보드 텍스트를 파싱해 CommandItem[] 반환 (줄바꿈은 토큰 ↵ 만 인식, \\n은 인식하지 않음) */
 export function parsePasteText(text: string): CommandItem[] {
   const tokens = tokenize(text);
   const result: CommandItem[] = [];
@@ -111,6 +112,10 @@ export function parsePasteText(text: string): CommandItem[] {
     }
     if (raw === 'next' || raw === '▶') {
       result.push({ type: 'notation', value: 'next' });
+      continue;
+    }
+    if (raw === '↵') {
+      result.push({ type: 'notation', value: 'linebreak' });
       continue;
     }
     if (raw === 'heat' || raw === 'H.') {

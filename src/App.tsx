@@ -63,8 +63,9 @@ function OutputCommand({ item }: { item: CommandItem }) {
     );
   }
   if (item.type === 'notation') {
+    if (item.value === 'linebreak') return <span className="output-linebreak" aria-hidden="true" />;
     const url = getNotationImageUrl(item.value);
-    const fallbackChar = item.value === 'next' ? '▶' : item.value === 'bracketl' ? '[' : item.value === 'bracketr' ? ']' : item.value === 'parenl' ? '(' : item.value === 'parenr' ? ')' : item.value === 'tilde' ? '~' : '';
+    const fallbackChar = item.value === 'next' ? '▶' : item.value === 'bracketl' ? '[' : item.value === 'bracketr' ? ']' : item.value === 'parenl' ? '(' : item.value === 'parenr' ? ')' : item.value === 'tilde' ? '~' : item.value === 'linebreak' ? '↵' : '';
     const altChar = fallbackChar || 'notation';
     if (!url) return <span className="output-fallback">{fallbackChar}</span>;
     return <img src={url} alt={altChar} className="notation-img" />;
@@ -216,13 +217,26 @@ export default function App() {
   const hasSelection = selection && selection.start < selection.end;
   const isCaretVisible = !hasSelection && !isTextMode;
 
-  const TEXT_ROW_HEIGHT = 48;
-  const PADDING = 4;
+  /* 원본 커맨드 이미지 크기(1040) 기준, 출력창 비율(아이콘 32px / 글자 14px / 패딩 2,6 / radius 4) 적용 */
+  const OUTPUT_ICON_HEIGHT = 32;
+  const OUTPUT_FONT_SIZE = 14;
+  const OUTPUT_PAD_H = 6;
+  const OUTPUT_PAD_V = 2;
+  const OUTPUT_RADIUS = 4;
+  const OUTPUT_ROW_GAP = 48;
+  const NATURAL_ICON_HEIGHT = 1040;
+  const scale = NATURAL_ICON_HEIGHT / OUTPUT_ICON_HEIGHT;
+  const DOWNLOAD_FONT_SIZE = Math.round(OUTPUT_FONT_SIZE * scale);
+  const DOWNLOAD_TEXT_PAD_H = Math.round(OUTPUT_PAD_H * scale);
+  const DOWNLOAD_TEXT_PAD_V = Math.round(OUTPUT_PAD_V * scale);
+  const DOWNLOAD_TEXT_BOX_RADIUS = Math.round(OUTPUT_RADIUS * scale);
+  const TEXT_ROW_HEIGHT = Math.round(OUTPUT_ROW_GAP * scale);
+  const PADDING = Math.round(4 * scale);
 
   const downloadOutput = useCallback(async () => {
     const el = outputRef.current;
     if (!el) return;
-    const children = Array.from(el.children) as (HTMLImageElement | HTMLSpanElement)[];
+    const children = Array.from(el.children) as (HTMLImageElement | HTMLSpanElement | HTMLBRElement | HTMLElement)[];
     const loadImage = (src: string): Promise<HTMLImageElement> =>
       new Promise((resolve, reject) => {
         const img = new Image();
@@ -235,52 +249,85 @@ export default function App() {
     type DrawItem =
       | { kind: 'img'; src: string; x: number; w: number; h: number; img?: HTMLImageElement }
       | { kind: 'text'; text: string; x: number; w: number; h: number };
-    const items: DrawItem[] = [];
     const measureCtx = document.createElement('canvas').getContext('2d');
-    if (measureCtx) measureCtx.font = '16px sans-serif';
+    const fontStr = `${DOWNLOAD_FONT_SIZE}px sans-serif`;
+    if (measureCtx) measureCtx.font = fontStr;
 
+    const rows: DrawItem[][] = [];
+    let currentRow: DrawItem[] = [];
+
+    const isLinebreak = (node: Element) =>
+      node.tagName === 'BR' || (node instanceof HTMLElement && node.classList.contains('output-linebreak'));
     for (const node of children) {
+      if (isLinebreak(node)) {
+        if (currentRow.length) {
+          rows.push(currentRow);
+          currentRow = [];
+        }
+        continue;
+      }
       if (node.tagName === 'IMG') {
-        items.push({ kind: 'img', src: (node as HTMLImageElement).src, x: 0, w: 0, h: 0 });
+        currentRow.push({ kind: 'img', src: (node as HTMLImageElement).src, x: 0, w: 0, h: 0 });
       } else {
         const text = (node.textContent || '').trim();
-        const w = measureCtx ? Math.ceil(measureCtx.measureText(text).width) + 16 : 40;
-        items.push({ kind: 'text', text, x: 0, w, h: TEXT_ROW_HEIGHT });
+        const textW = measureCtx ? Math.ceil(measureCtx.measureText(text).width) : 40;
+        const w = textW + DOWNLOAD_TEXT_PAD_H * 2;
+        currentRow.push({ kind: 'text', text, x: 0, w, h: TEXT_ROW_HEIGHT });
       }
     }
+    if (currentRow.length) rows.push(currentRow);
+    if (rows.length === 0) return;
 
-    for (const item of items) {
-      if (item.kind === 'img') {
-        try {
-          item.img = await loadImage(item.src);
-          if (item.img) {
-            item.w = item.img.naturalWidth;
-            item.h = item.img.naturalHeight;
+    for (const row of rows) {
+      for (const item of row) {
+        if (item.kind === 'img') {
+          try {
+            item.img = await loadImage(item.src);
+            if (item.img) {
+              item.w = item.img.naturalWidth;
+              item.h = item.img.naturalHeight;
+            } else {
+              item.w = NATURAL_ICON_HEIGHT;
+              item.h = NATURAL_ICON_HEIGHT;
+            }
+          } catch {
+            item.img = undefined;
+            item.w = NATURAL_ICON_HEIGHT;
+            item.h = NATURAL_ICON_HEIGHT;
           }
-        } catch {
-          item.img = undefined;
-          item.w = 24;
-          item.h = TEXT_ROW_HEIGHT;
         }
       }
     }
 
-    const rowHeight = Math.max(
-      ...items.map((it) => (it.kind === 'img' ? it.h : it.h)),
-      TEXT_ROW_HEIGHT
+    const rowHeights = rows.map((row) =>
+      Math.max(...row.map((it) => (it.kind === 'img' ? it.h : it.h)), TEXT_ROW_HEIGHT)
+    );
+    const totalHeight = rowHeights.reduce((a, b) => a + b + PADDING, -PADDING);
+    const totalWidth = Math.max(
+      ...rows.map((row) => {
+        let x = 0;
+        for (const item of row) {
+          const width = item.kind === 'img' ? (item.w || 24) : item.w;
+          x += width + PADDING;
+        }
+        return Math.max(x - PADDING, 1);
+      }),
+      1
     );
 
-    let x = 0;
-    for (const item of items) {
-      item.x = x;
-      const width = item.kind === 'img' ? (item.w || 24) : item.w;
-      x += width + PADDING;
+    for (const row of rows) {
+      const rowHeight = Math.max(...row.map((it) => (it.kind === 'img' ? it.h : it.h)), TEXT_ROW_HEIGHT);
+      let x = 0;
+      for (const item of row) {
+        item.x = x;
+        const width = item.kind === 'img' ? (item.w || 24) : item.w;
+        x += width + PADDING;
+      }
     }
-    const totalWidth = Math.max(x - PADDING, 1);
 
     const canvas = document.createElement('canvas');
     canvas.width = totalWidth;
-    canvas.height = rowHeight;
+    canvas.height = totalHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -290,15 +337,31 @@ export default function App() {
       else ctx.fillStyle = '#1a1a1a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-    ctx.font = '16px sans-serif';
-    ctx.fillStyle = downloadBg === 'white' ? '#333' : '#eee';
+    ctx.font = fontStr;
+    const textColor = downloadBg === 'white' ? '#333333' : '#e4e4e7';
+    const textBoxBg = downloadBg === 'white' ? '#e4e4e7' : '#252528';
 
-    for (const item of items) {
-      if (item.kind === 'img' && item.img && item.w > 0 && item.h > 0) {
-        ctx.drawImage(item.img, item.x, (rowHeight - item.h) / 2, item.w, item.h);
-      } else if (item.kind === 'text') {
-        ctx.fillText(item.text, item.x + 8, rowHeight / 2 + 5);
+    let y = 0;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const rowHeight = rowHeights[r];
+      for (const item of row) {
+        if (item.kind === 'img' && item.img && item.w > 0 && item.h > 0) {
+          ctx.drawImage(item.img, item.x, y + (rowHeight - item.h) / 2, item.w, item.h);
+        } else if (item.kind === 'text') {
+          const boxH = DOWNLOAD_FONT_SIZE + DOWNLOAD_TEXT_PAD_V * 2;
+          const boxY = y + (rowHeight - boxH) / 2;
+          ctx.fillStyle = textBoxBg;
+          const r = DOWNLOAD_TEXT_BOX_RADIUS;
+          ctx.beginPath();
+          ctx.roundRect(item.x, boxY, item.w, boxH, r);
+          ctx.fill();
+          ctx.fillStyle = textColor;
+          ctx.textBaseline = 'middle';
+          ctx.fillText(item.text, item.x + DOWNLOAD_TEXT_PAD_H, y + rowHeight / 2);
+        }
       }
+      y += rowHeight + PADDING;
     }
 
     const link = document.createElement('a');
