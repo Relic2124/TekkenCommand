@@ -21,6 +21,20 @@ function toHoldNotation(dir: DirectionNotation | null): DirectionNotation | null
 
 export type SelectionRange = { start: number; end: number };
 
+export type HistoryState = {
+  commands: CommandItem[];
+  cursorIndex: number;
+  selection: SelectionRange | null;
+};
+
+const HISTORY_MAX = 100;
+
+const initialHistoryState: HistoryState = {
+  commands: [],
+  cursorIndex: 0,
+  selection: null,
+};
+
 export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [cursorIndex, setCursorIndexState] = useState(0);
@@ -35,6 +49,17 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   const [currentText, setCurrentText] = useState('');
   const pressedKeys = useRef<Set<string>>(new Set());
   const keyMapping = useRef<KeyMapping>({ ...defaultKeyMapping, ...customMapping });
+
+  /* 초기 항목은 commands를 새 배열로 두어 참조 공유 방지. 그렇지 않으면 history[0].commands가 나중에 변경되어 복원 시 빈 배열이 안 나옴 */
+  const historyRef = useRef<HistoryState[]>([{ ...initialHistoryState, commands: [] }]);
+  const historyIndexRef = useRef(0);
+  const historyFlagRef = useRef(0); /* 0: 일반, 1: 커서/선택 변경됨 */
+  /** 현재 장면 위치(1-based). history에는 현재 장면 제외 저장되므로, tip일 때 sceneRef = length */
+  const sceneRef = useRef(1);
+
+  useEffect(() => {
+    console.log('[undo] initial', { history: historyRef.current.map((s, i) => ({ i, commands: s.commands, cursor: s.cursorIndex, sel: s.selection })), index: historyIndexRef.current, scene: sceneRef.current });
+  }, []);
 
   const prevDirection = useRef<DirectionNotation | null>(null);
   const framesHeld = useRef<number>(0);
@@ -68,12 +93,111 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     });
   }, [commands.length, commands]);
 
-  const setCursorIndex = useCallback((value: number | ((prev: number) => number)) => {
+  const snapshotFromRefs = useCallback((): HistoryState => ({
+    commands: commandsRef.current.slice(),
+    cursorIndex: cursorIndexRef.current,
+    selection: selectionRef.current ? { ...selectionRef.current } : null,
+  }), []);
+
+  const pushHistory = useCallback((truncateRedo: boolean) => {
+    const history = historyRef.current;
+    const idx = historyIndexRef.current;
+    const scene = sceneRef.current;
+    /* idx=0, scene=1(차이 1)일 때 push하면 [S0,S0]가 되어 (2,1,3)이 됨. 이때는 push 없이 scene만 2로 올려 (1,0,2) 유지 */
+    if (idx === 0 && scene === 1) {
+      if (truncateRedo) history.length = 1;
+      sceneRef.current = 2;
+      historyFlagRef.current = 0;
+      return;
+    }
+    if (truncateRedo) history.length = idx + 1;
+    history.push(snapshotFromRefs());
+    historyIndexRef.current = history.length - 1;
+    while (history.length > HISTORY_MAX) {
+      history.shift();
+      historyIndexRef.current--;
+    }
+    historyFlagRef.current = 0;
+    /* tip = 현재 장면이 history에 없음(모델). scene=length+1로 두어 undo 시 idx+1<scene 성립 */
+    sceneRef.current = history.length + 1;
+    console.log('[undo] after push', { truncateRedo, length: history.length, index: historyIndexRef.current, scene: sceneRef.current, states: history.map((s, i) => ({ i, commandsLen: s.commands.length, commands: s.commands, cursor: s.cursorIndex, sel: s.selection })) });
+  }, [snapshotFromRefs]);
+
+  const tryPushUndoState = useCallback((trigger: 'insert' | 'always') => {
+    if (trigger === 'insert' && historyFlagRef.current !== 1) {
+      /* push는 안 하지만 현재 장면은 진행됨 → scene을 tip(length+1)으로 맞춰 undo 시 idx+1<scene 성립 */
+      sceneRef.current = historyRef.current.length + 1;
+      return;
+    }
+    pushHistory(true);
+  }, [pushHistory]);
+
+  const undo = useCallback(() => {
+    const history = historyRef.current;
+    const idx = historyIndexRef.current;
+    const scene = sceneRef.current;
+    /* idx가 0이어도 flag=1이면 입력 후 커서만 있는 상태이므로 undo 허용 */
+    // if (idx <= 0 && historyFlagRef.current === 0) return;
+    /* Python: if idx+1==len(history): history.append(scene) */
+    if (idx + 1 === history.length) history.push(snapshotFromRefs());
+    /* Python: if idx+1<scene: scene=history[idx]; if idx>0: idx-- */
+    if (idx + 1 < scene) {
+      const s = history[idx];
+      /* idx===0(첫 장면)이면 참조 공유 이슈 없이 빈 배열로 확실히 복원 */
+      setCommands(idx === 0 ? [] : s.commands.slice());
+      setCursorIndexState(s.cursorIndex);
+      setSelectionState(s.selection ? { ...s.selection } : null);
+      if (idx > 0) historyIndexRef.current = idx - 1;
+      sceneRef.current = idx + 1; /* 불러온 장면 위치(1-based) */
+    }
+    /* undo 후 다음 커맨드 입력 시 저장되도록 */
+    historyFlagRef.current = 1;
+    console.log('[undo] undo', { length: history.length, index: historyIndexRef.current, scene: sceneRef.current });
+  }, [snapshotFromRefs]);
+
+  const redo = useCallback(() => {
+    const history = historyRef.current;
+    const idx = historyIndexRef.current;
+    const scene = sceneRef.current;
+    /* Python: if idx+1<scene: if idx+2<l: scene=history[idx+2]; idx++ */
+    if (idx + 1 < scene) {
+      if (idx + 2 < history.length) {
+        const s = history[idx + 2];
+        setCommands(s.commands.slice());
+        setCursorIndexState(s.cursorIndex);
+        setSelectionState(s.selection ? { ...s.selection } : null);
+        historyIndexRef.current = idx + 1;
+        sceneRef.current = idx + 3; /* 불러온 장면 위치(1-based) */
+      }
+    } else if (idx + 1 < history.length) {
+      /* Python: elif idx+1<l: scene=history[idx+1] (idx 유지) */
+      const s = history[idx + 1];
+      setCommands(s.commands.slice());
+      setCursorIndexState(s.cursorIndex);
+      setSelectionState(s.selection ? { ...s.selection } : null);
+      sceneRef.current = idx + 2;
+    }
+    /* redo 후 다음 커맨드 입력 시 저장되도록 */
+    historyFlagRef.current = 1;
+    console.log('[undo] redo', { length: history.length, index: historyIndexRef.current, scene: sceneRef.current });
+  }, []);
+
+  const setCursorIndexInternal = useCallback((value: number | ((prev: number) => number)) => {
     setCursorIndexState((prev) => {
       const next = typeof value === 'function' ? value(prev) : value;
       return Math.max(0, Math.min(commands.length, next));
     });
   }, [commands.length]);
+
+  const setCursorIndex = useCallback((value: number | ((prev: number) => number)) => {
+    historyFlagRef.current = 1;
+    setCursorIndexInternal(value);
+  }, [setCursorIndexInternal]);
+
+  const setSelectionWrapped = useCallback((value: SelectionRange | null) => {
+    historyFlagRef.current = 1;
+    setSelectionState(value);
+  }, []);
 
   useEffect(() => {
     if (customMapping) {
@@ -150,61 +274,75 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         return;
       }
 
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyZ') {
+        const active = document.activeElement as HTMLElement | null;
+        /* INPUT/TEXTAREA에서 텍스트 입력 중일 때만 건너뜀. 그 외(포커스가 다른 곳에 있어도) 항상 undo */
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && code === 'KeyY') {
+        const active = document.activeElement as HTMLElement | null;
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        event.preventDefault();
+        redo();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && code === 'KeyA') {
         const active = document.activeElement as HTMLElement | null;
-        if (active?.closest?.('.input-area')) {
-          if (isTextMode && active.tagName === 'INPUT') return;
-          event.preventDefault();
-          const len = commandsLengthRef.current;
-          if (len > 0) {
-            setSelectionState({ start: 0, end: len });
-            setCursorIndexState(len);
-          }
-          return;
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        event.preventDefault();
+        historyFlagRef.current = 1;
+        const len = commandsLengthRef.current;
+        if (len > 0) {
+          setSelectionState({ start: 0, end: len });
+          setCursorIndexState(len);
         }
+        return;
       }
       if ((event.ctrlKey || event.metaKey) && code === 'KeyC') {
         const active = document.activeElement as HTMLElement | null;
-        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
-          const sel = selectionRef.current;
-          const cmds = commandsRef.current;
-          if (cmds.length > 0) {
-            const toCopy = sel && sel.start < sel.end
-              ? cmds.slice(sel.start, sel.end)
-              : cmds;
-            const text = commandsToCopyText(toCopy);
-            if (text) {
-              event.preventDefault();
-              navigator.clipboard.writeText(text);
-            }
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        const sel = selectionRef.current;
+        const cmds = commandsRef.current;
+        if (cmds.length > 0) {
+          const toCopy = sel && sel.start < sel.end
+            ? cmds.slice(sel.start, sel.end)
+            : cmds;
+          const text = commandsToCopyText(toCopy);
+          if (text) {
+            event.preventDefault();
+            navigator.clipboard.writeText(text);
           }
-          return;
         }
+        return;
       }
       if ((event.ctrlKey || event.metaKey) && code === 'KeyX') {
         const active = document.activeElement as HTMLElement | null;
-        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
-          const sel = selectionRef.current;
-          const cmds = commandsRef.current;
-          if (sel && sel.start < sel.end && cmds.length > 0) {
-            event.preventDefault();
-            const toCopy = cmds.slice(sel.start, sel.end);
-            const text = commandsToCopyText(toCopy);
-            if (text) navigator.clipboard.writeText(text);
-            setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
-            setCursorIndexState(sel.start);
-            setSelectionState(null);
-          }
-          return;
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        const sel = selectionRef.current;
+        const cmds = commandsRef.current;
+        if (sel && sel.start < sel.end && cmds.length > 0) {
+          event.preventDefault();
+          tryPushUndoState('always');
+          const toCopy = cmds.slice(sel.start, sel.end);
+          const text = commandsToCopyText(toCopy);
+          if (text) navigator.clipboard.writeText(text);
+          setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
+          setCursorIndexState(sel.start);
+          setSelectionState(null);
         }
+        return;
       }
       if ((event.ctrlKey || event.metaKey) && code === 'KeyV') {
         const active = document.activeElement as HTMLElement | null;
-        if (active?.closest?.('.input-area') && !(isTextMode && active.tagName === 'INPUT')) {
-          event.preventDefault();
-          navigator.clipboard.readText().then((text) => {
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        event.preventDefault();
+        navigator.clipboard.readText().then((text) => {
             const toInsert = parsePasteText(text);
             if (toInsert.length === 0) return;
+            tryPushUndoState('always');
             const sel = selectionRef.current;
             const idx = cursorIndexRef.current;
             setCommands((prev) => {
@@ -217,12 +355,14 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
             setCursorIndexState(newCursor);
             setSelectionState(null);
           });
-          return;
-        }
+        return;
       }
 
       if (code === 'Space') {
-        if (!event.repeat) addCommand({ type: 'notation', value: 'next' });
+        if (!event.repeat) {
+          tryPushUndoState('insert');
+          addCommand({ type: 'notation', value: 'next' });
+        }
         event.preventDefault();
         return;
       }
@@ -236,6 +376,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (code === 'Backspace') {
+        tryPushUndoState('always');
         const sel = selectionRef.current;
         if (sel && sel.start < sel.end) {
           setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
@@ -254,6 +395,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (code === 'Delete') {
+        tryPushUndoState('always');
         const sel = selectionRef.current;
         if (sel && sel.start < sel.end) {
           setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
@@ -271,6 +413,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (code === 'ArrowLeft') {
+        historyFlagRef.current = 1;
         if (event.shiftKey) {
           const cur = cursorIndexRef.current;
           const newCursor = Math.max(0, cur - 1);
@@ -292,6 +435,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         return;
       }
       if (code === 'ArrowRight') {
+        historyFlagRef.current = 1;
         if (event.shiftKey) {
           const len = commandsLengthRef.current;
           const cur = cursorIndexRef.current;
@@ -317,38 +461,44 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       if (!event.repeat) {
         const key = event.key;
         if (code === 'BracketLeft' || key === '[') {
+          tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'bracketl' });
           event.preventDefault();
           return;
         }
         if (code === 'BracketRight' || key === ']') {
+          tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'bracketr' });
           event.preventDefault();
           return;
         }
         if (key === '(') {
+          tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'parenl' });
           event.preventDefault();
           return;
         }
         if (key === ')') {
+          tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'parenr' });
           event.preventDefault();
           return;
         }
         if (key === '~' || (code === 'Backquote' && event.shiftKey)) {
+          tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'tilde' });
           event.preventDefault();
           return;
         }
         if (code === 'Backslash' || key === '\\') {
+          tryPushUndoState('always');
           addCommand({ type: 'notation', value: 'linebreak' });
           event.preventDefault();
           return;
         }
       }
     },
-    [isTextMode, toggleTextMode, addCommand]
+    [isTextMode, toggleTextMode, addCommand, tryPushUndoState, undo, redo]
   );
 
   const handleKeyUp = useCallback((event: KeyboardEvent) => {
@@ -423,6 +573,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       }
 
       if (toAdd.length > 0) {
+        tryPushUndoState('insert');
         const sel = selectionRef.current;
         const hasSel = sel && sel.start < sel.end;
         if (hasSel) selectionRef.current = null;
@@ -475,7 +626,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [isTextMode]);
+  }, [isTextMode, tryPushUndoState]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);
@@ -495,6 +646,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   }, []);
 
   const clearCommands = useCallback(() => {
+    tryPushUndoState('always');
     setCommands([]);
     setCursorIndexState(0);
     setSelectionState(null);
@@ -504,7 +656,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     framesHeld.current = 0;
     prevButton.current = null;
     prevSpecial.current = null;
-  }, []);
+  }, [tryPushUndoState]);
 
   const removeLastCommand = useCallback(() => {
     setCommands((prev) => prev.slice(0, -1));
@@ -514,6 +666,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
   /** 텍스트 입력 완료: 커서 위치에 삽입 또는 지정 인덱스 항목 교체 후 텍스트 모드 종료 */
   const finishTextInput = useCallback(
     (value: string) => {
+      tryPushUndoState('always');
       const trimmed = value.trim();
       const editingAt = textEditIndexRef.current;
       if (editingAt !== null) {
@@ -536,7 +689,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
       pressedKeys.current.clear();
       setIsTextMode(false);
     },
-    []
+    [tryPushUndoState]
   );
 
   useEffect(() => {
@@ -566,18 +719,20 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     const sel = selectionRef.current;
     const cmds = commandsRef.current;
     if (!sel || sel.start >= sel.end || cmds.length === 0) return;
+    tryPushUndoState('always');
     const toCopy = cmds.slice(sel.start, sel.end);
     const text = commandsToCopyText(toCopy);
     if (text) navigator.clipboard.writeText(text);
     setCommands((prev) => [...prev.slice(0, sel.start), ...prev.slice(sel.end)]);
     setCursorIndexState(sel.start);
     setSelectionState(null);
-  }, []);
+  }, [tryPushUndoState]);
 
   const pasteFromClipboard = useCallback(async () => {
     const text = await navigator.clipboard.readText();
     const toInsert = parsePasteText(text);
     if (toInsert.length === 0) return;
+    tryPushUndoState('always');
     const sel = selectionRef.current;
     const idx = cursorIndexRef.current;
     setCommands((prev) => {
@@ -589,7 +744,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     const newCursor = (sel && sel.start < sel.end ? sel.start : idx) + toInsert.length;
     setCursorIndexState(newCursor);
     setSelectionState(null);
-  }, []);
+  }, [tryPushUndoState]);
 
   /** 선택 해제 후 커서를 맨 끝으로 이동 (빈 영역 클릭 등) */
   const clearSelectionAndMoveCursorToEnd = useCallback(() => {
@@ -602,7 +757,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     cursorIndex,
     setCursorIndex,
     selection,
-    setSelection: setSelectionState,
+    setSelection: setSelectionWrapped,
     selectAll,
     copyToClipboard,
     cutToClipboard,
@@ -618,5 +773,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
     updateText,
     startTextEdit,
     clearSelectionAndMoveCursorToEnd,
+    undo,
+    redo,
   };
 }
