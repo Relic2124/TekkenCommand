@@ -302,7 +302,7 @@ export default function App() {
     }
 
     const link = document.createElement('a');
-    link.download = 'tekken-notation.png';
+    link.download = 'tekken_command.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
   }, [downloadBg]);
