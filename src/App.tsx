@@ -81,12 +81,18 @@ type Theme = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'tekken-theme';
 
+function getSystemTheme(): Theme {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
 function loadTheme(): Theme {
   try {
     const s = localStorage.getItem(THEME_STORAGE_KEY);
-    return s === 'light' ? 'light' : 'dark';
+    if (s === 'light' || s === 'dark') return s;
+    return getSystemTheme();
   } catch {
-    return 'dark';
+    return getSystemTheme();
   }
 }
 
@@ -105,6 +111,21 @@ export default function App() {
       /* ignore */
     }
   }, [theme]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    const listener = () => {
+      try {
+        if (localStorage.getItem(THEME_STORAGE_KEY) == null) {
+          setThemeState(getSystemTheme());
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, []);
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);

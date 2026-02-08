@@ -169,7 +169,7 @@
 }
 
 .input-area {
-  cursor: default; /* I자 커서 제거, 만든 커서(|)만 보이게 */
+  cursor: text;
   gap: calc(4px * 0.66); /* 커맨드 사이 간격 0.66 비율 */
 }
 
@@ -187,12 +187,12 @@
   min-width: 8px;
   min-height: 1.2em;
   padding: 0 2px;
-  cursor: default;
+  cursor: text;
   border-radius: 2px;
 }
 
 .input-command-wrap {
-  cursor: default;
+  cursor: text;
   border-radius: 2px;
   padding: 0 1px;
 }
