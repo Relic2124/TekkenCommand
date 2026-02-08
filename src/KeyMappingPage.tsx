@@ -165,10 +165,11 @@ const MODIFIER_CODES = new Set([
   'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight',
 ]);
 
-/** 키 매핑에 사용 불가: 물리 키 기준. Enter, Space, Backspace/Delete, [ ] 키, ` ~ 키. ( ) 는 e.key로만 막음(9,0은 매핑 가능) */
+/** 키 매핑에 사용 불가: 물리 키 기준. Enter, Space, Backspace/Delete, [ ] 키, ` ~ 키, Home/End(슬롯 커서). ( ) 는 e.key로만 막음 */
 const FORBIDDEN_KEY_CODES = new Set([
   'Enter', 'Space', 'Backspace', 'Delete',
-  'BracketLeft', 'BracketRight', 'Backquote', // [ ] 키, ` ~ 키 — Shift 유무 상관없이 막음
+  'BracketLeft', 'BracketRight', 'Backquote',
+  'Home', 'End',
 ]);
 const FORBIDDEN_KEYS = new Set(['(', ')']);
 

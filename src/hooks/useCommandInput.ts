@@ -458,6 +458,36 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         return;
       }
 
+      if (code === 'Home') {
+        const active = document.activeElement as HTMLElement | null;
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        historyFlagRef.current = 1;
+        if (event.shiftKey) {
+          const cur = cursorIndexRef.current;
+          setSelectionState(cur > 0 ? { start: 0, end: cur } : null);
+        } else {
+          setSelectionState(null);
+        }
+        setCursorIndexState(0);
+        event.preventDefault();
+        return;
+      }
+      if (code === 'End') {
+        const active = document.activeElement as HTMLElement | null;
+        if (isTextMode && (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA')) return;
+        historyFlagRef.current = 1;
+        const len = commandsLengthRef.current;
+        if (event.shiftKey) {
+          const cur = cursorIndexRef.current;
+          setSelectionState(cur < len ? { start: cur, end: len } : null);
+        } else {
+          setSelectionState(null);
+        }
+        setCursorIndexState(len);
+        event.preventDefault();
+        return;
+      }
+
       if (!event.repeat) {
         const key = event.key;
         if (code === 'BracketLeft' || key === '[') {
