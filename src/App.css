@@ -360,6 +360,15 @@
 }
 
 /* 키매핑 페이지 */
+.keymap-forbidden-flash {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+[data-theme='light'] .keymap-forbidden-flash {
+  color: #dc2626;
+}
+
 .keymap-page .keymap-content {
   max-width: 470px;
   margin: 0 auto;

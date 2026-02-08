@@ -165,6 +165,20 @@ const MODIFIER_CODES = new Set([
   'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight',
 ]);
 
+/** 키 매핑에 사용 불가: 물리 키 기준. Enter, Space, Backspace/Delete, [ ] 키, ` ~ 키. ( ) 는 e.key로만 막음(9,0은 매핑 가능) */
+const FORBIDDEN_KEY_CODES = new Set([
+  'Enter', 'Space', 'Backspace', 'Delete',
+  'BracketLeft', 'BracketRight', 'Backquote', // [ ] 키, ` ~ 키 — Shift 유무 상관없이 막음
+]);
+const FORBIDDEN_KEYS = new Set(['(', ')']);
+
+/** 금지된 물리 키(e.code)에 대해 플래시에 보여줄 문자 */
+const FORBIDDEN_CODE_DISPLAY: Record<string, string> = {
+  BracketLeft: '[',
+  BracketRight: ']',
+  Backquote: '~',
+};
+
 function isListeningFor(listening: ListeningSlot | null, type: ListeningSlot['type'], key: string): boolean {
   if (!listening || listening.type !== type) return false;
   return listening.key === key;
@@ -190,6 +204,7 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
   const heatImgUrl = getNotationImageUrl('heat');
   const rageImgUrl = getNotationImageUrl('rage');
   const [listeningFor, setListeningFor] = useState<ListeningSlot | null>(null);
+  const [forbiddenKeyFlash, setForbiddenKeyFlash] = useState<string | null>(null);
   const [showDiagonalSection, setShowDiagonalSection] = useState(loadShowDiagonal);
   const [showAdditionalButtons, setShowAdditionalButtons] = useState(loadShowAdditionalButtons);
 
@@ -290,6 +305,7 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
       onMappingChange(next);
       saveKeyMapping(next);
       setListeningFor(null);
+      setForbiddenKeyFlash(null);
     },
     [listeningFor, keyMapping, onMappingChange]
   );
@@ -301,20 +317,37 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
       e.stopPropagation();
       if (e.code === 'Escape') {
         setListeningFor(null);
+        setForbiddenKeyFlash(null);
         return;
       }
       if (MODIFIER_CODES.has(e.code)) return;
+      if (FORBIDDEN_KEY_CODES.has(e.code) || FORBIDDEN_KEYS.has(e.key)) {
+        const flashLabel = FORBIDDEN_KEYS.has(e.key)
+          ? e.key
+          : FORBIDDEN_CODE_DISPLAY[e.code] ?? keyCodeToLabel(e.code);
+        setForbiddenKeyFlash(flashLabel);
+        return;
+      }
+      setForbiddenKeyFlash(null);
       assignKey(e.code);
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [listeningFor, assignKey]);
 
+  useEffect(() => {
+    if (!forbiddenKeyFlash) return;
+    const t = setTimeout(() => setForbiddenKeyFlash(null), 700);
+    return () => clearTimeout(t);
+  }, [forbiddenKeyFlash]);
+
   const handleReset = () => {
     onMappingChange(defaultKeyMapping);
     saveKeyMapping(defaultKeyMapping);
     setListeningFor(null);
+    setForbiddenKeyFlash(null);
   };
+
 
   return (
     <div className="app keymap-page">
@@ -363,7 +396,9 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                         className="keymap-key-btn"
                         onClick={() => setListeningFor(listening ? null : { type: 'direction', key })}
                       >
-                        {listening ? '키 입력 대기...' : keyCodesToLabel(codes)}
+                        {listening
+                          ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                          : keyCodesToLabel(codes)}
                       </button>
                     </td>
                   </tr>
@@ -387,7 +422,9 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                             className="keymap-key-btn"
                             onClick={() => setListeningFor(listening ? null : { type: 'direction', key })}
                           >
-                            {listening ? '키 입력 대기...' : keyCodesToLabel(displayCodes) || '—'}
+                            {listening
+                            ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                            : keyCodesToLabel(displayCodes) || '—'}
                           </button>
                           {hasOverride && (
                             <button
@@ -443,7 +480,9 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                         className="keymap-key-btn"
                         onClick={() => setListeningFor(listening ? null : { type: 'button', key: cmd })}
                       >
-                        {listening ? '키 입력 대기...' : keyCodesToLabel(codes)}
+                        {listening
+                          ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                          : keyCodesToLabel(codes)}
                       </button>
                     </td>
                   </tr>
@@ -466,12 +505,14 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                           className="keymap-key-btn"
                           onClick={() => setListeningFor(listening ? null : { type: 'button', key: cmd })}
                         >
-                          {listening ? '키 입력 대기...' : keyCodesToLabel(codes)}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+{listening
+                        ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                        : keyCodesToLabel(codes)}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div className="keymap-diagonal-toggle-wrap">
@@ -511,7 +552,7 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                     )}
                   >
                     {isListeningFor(listeningFor, 'special', 'heat')
-                      ? '키 입력 대기...'
+                      ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
                       : keyCodesToLabel(ensureStringArray(keyMapping.special.heat))}
                   </button>
                 </td>
@@ -530,7 +571,7 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                     )}
                   >
                     {isListeningFor(listeningFor, 'special', 'rage')
-                      ? '키 입력 대기...'
+                      ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
                       : keyCodesToLabel(ensureStringArray(keyMapping.special.rage))}
                   </button>
                 </td>
