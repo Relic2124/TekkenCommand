@@ -26,7 +26,7 @@ export const defaultKeyMapping: KeyMapping = {
     d: ['KeyS'],
     f: ['KeyD'],
     b: ['KeyA'],
-    n: ['KeyF'],
+    n: ['NumpadEnter'],
   },
   buttons: {
     '1': ['Numpad4'],
