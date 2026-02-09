@@ -473,7 +473,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>철권 8 커맨드 생성기</h1>
+        <h1>철권 8 커맨드 이미지 생성기</h1>
         <nav className="page-nav">
           <button
             type="button"
