@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, useLayoutEffect, Fragment, useState } from 'react';
+import { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useCommandInput, type SlotPositionsRef } from './hooks/useCommandInput.js';
 import type { CommandItem, KeyMapping } from './types/index.js';
 import { KeyMappingPage, loadKeyMapping, saveKeyMapping } from './KeyMappingPage.js';
@@ -481,7 +481,7 @@ export default function App() {
           </div>
           <div ref={inputAreaRef} className="input-area" tabIndex={0}>
             {Array.from({ length: commands.length + 1 }, (_, i) => (
-              <Fragment key={i}>
+              <span key={i} className="input-cell">
                 <span
                   className="input-slot"
                   data-position={i}
@@ -602,7 +602,7 @@ export default function App() {
                     )}
                   </span>
                 )}
-              </Fragment>
+              </span>
             ))}
             <span
               className="input-area-fill"

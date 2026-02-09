@@ -170,7 +170,15 @@
 
 .input-area {
   cursor: text;
-  gap: calc(4px * 0.66); /* 커맨드 사이 간격 0.66 비율 */
+  gap: calc(4px * 0.66); /* 셀과 셀 사이 간격 (슬롯+커맨드가 한 단위로 줄바꿈) */
+}
+
+/* 슬롯과 커맨드를 한 단위로 묶어 줄바꿈 시 같이 넘어가게 함 */
+.input-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(4px * 0.66);
+  flex-shrink: 0;
 }
 
 .input-area-fill {
@@ -189,6 +197,7 @@
   padding: 0 2px;
   cursor: text;
   border-radius: 2px;
+  
 }
 
 .input-command-wrap {
