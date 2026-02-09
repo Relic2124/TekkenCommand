@@ -143,6 +143,8 @@ export default function App() {
 
   const inputAreaRef = useRef<HTMLDivElement>(null);
   const slotPositionsRef: SlotPositionsRef = useRef<{ tops: number[]; lefts: number[] } | null>(null);
+  /** linebreak 이후 커서가 위(eol) 슬롯에 보일지, 아래줄(primary) 슬롯에 보일지 제어 */
+  const [linebreakCursor, setLinebreakCursor] = useState<{ index: number; mode: 'eol' | 'below' } | null>(null);
 
   const {
     commands,
@@ -168,7 +170,7 @@ export default function App() {
     const MEASURE_DEBOUNCE_MS = 80;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const measure = () => {
-      const slots = el.querySelectorAll('.input-slot');
+      const slots = el.querySelectorAll('.input-slot[data-visual="primary"]');
       if (slots.length === 0) {
         slotPositionsRef.current = null;
         return;
@@ -194,6 +196,36 @@ export default function App() {
       if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, [commands.length, page]);
+
+  /* linebreak eol 모드에서 다른 위치로 커서가 이동하면 eol 모드 해제 */
+  useEffect(() => {
+    if (linebreakCursor && linebreakCursor.index !== cursorIndex) {
+      setLinebreakCursor(null);
+    }
+  }, [cursorIndex, linebreakCursor]);
+
+  /** 선택 앵커: 일반 클릭 시 설정, Shift+클릭 시 이 위치부터 선택 */
+  const selectionAnchorRef = useRef<number>(0);
+
+  /** Shift+클릭: 앵커~target 범위를 선택하고 커서를 target으로 이동 */
+  const handleShiftClick = useCallback((target: number) => {
+    /* 선택이 없으면 현재 커서를 앵커로 사용(초기 상태·전체 지우기 후 등) */
+    if (!selection) selectionAnchorRef.current = cursorIndex;
+    const anchor = selectionAnchorRef.current;
+    if (anchor === target) {
+      setSelection(null);
+    } else {
+      setSelection({ start: Math.min(anchor, target), end: Math.max(anchor, target) });
+    }
+    setCursorIndex(target);
+  }, [selection, cursorIndex, setSelection, setCursorIndex]);
+
+  /** 일반 클릭: 앵커를 갱신하고 선택 해제·커서 이동 */
+  const handleNormalClick = useCallback((pos: number) => {
+    selectionAnchorRef.current = pos;
+    setSelection(null);
+    setCursorIndex(pos);
+  }, [setSelection, setCursorIndex]);
 
   const dragAnchorStartRef = useRef<number>(0);
   const dragAnchorEndRef = useRef<number>(0);
@@ -481,39 +513,43 @@ export default function App() {
           </div>
           <div ref={inputAreaRef} className="input-area" tabIndex={0}>
             {Array.from({ length: commands.length + 1 }, (_, i) => {
-              const prevIsLinebreak = i > 0 && commands[i - 1].type === 'notation' && commands[i - 1].value === 'linebreak';
               return (
               <Fragment key={i}>
               <span className="input-cell">
-                {!prevIsLinebreak && (
                 <span
                   className="input-slot"
+                  data-visual="primary"
                   data-position={i}
                   role="button"
                   tabIndex={-1}
                   aria-label={`커서 위치 ${i + 1}`}
                   onMouseDown={(e) => {
                     if (e.button !== 0) return;
+                    if (e.shiftKey) { handleShiftClick(i); isDraggingRef.current = false; return; }
+                    selectionAnchorRef.current = i;
                     dragAnchorStartRef.current = i;
                     dragAnchorEndRef.current = i;
                     isDraggingRef.current = true;
                     setSelection(null);
                     setCursorIndex(i);
                   }}
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (e.shiftKey) return;
                     if (didDragRef.current) {
                       didDragRef.current = false;
                       return;
                     }
-                    setSelection(null);
-                    setCursorIndex(i);
+                    setLinebreakCursor(null);
+                    handleNormalClick(i);
                   }}
                 >
-                  {cursorIndex === i && isCaretVisible && !(isTextMode && textEditIndex === null) && (
+                  {cursorIndex === i &&
+                    isCaretVisible &&
+                    !(isTextMode && textEditIndex === null) &&
+                    !(linebreakCursor && linebreakCursor.index === i && linebreakCursor.mode === 'eol') && (
                     <span className="input-caret">|</span>
                   )}
                 </span>
-                )}
                 {isTextMode && textEditIndex === null && i === cursorIndex ? (
                   <span className="text-cursor">
                     "
@@ -552,6 +588,9 @@ export default function App() {
                       if (e.button !== 0) return;
                       if (textEditIndex !== null && textEditIndex !== i) finishTextInput(currentText);
                       if (textEditIndex === i) return;
+                      if (e.shiftKey) { handleShiftClick(i + 1); isDraggingRef.current = false; return; }
+                      setLinebreakCursor(null);
+                      selectionAnchorRef.current = i + 1;
                       dragAnchorStartRef.current = i;
                       dragAnchorEndRef.current = i + 1;
                       isDraggingRef.current = true;
@@ -560,12 +599,15 @@ export default function App() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (e.shiftKey) return;
                       if (textEditIndex !== null && textEditIndex !== i) finishTextInput(currentText);
                       if (textEditIndex === i) return;
                       if (didDragRef.current) {
                         didDragRef.current = false;
                         return;
                       }
+                      setLinebreakCursor(null);
+                      selectionAnchorRef.current = i + 1;
                       setSelection({ start: i, end: i + 1 });
                       setCursorIndex(i + 1);
                     }}
@@ -610,34 +652,19 @@ export default function App() {
               </span>
               {i < commands.length && commands[i].type === 'notation' && commands[i].value === 'linebreak' && (
                 <>
+                  {/* 같은 줄 끝(eol)에 표시되는 보조 슬롯 - 클릭은 fill에서 처리, caret만 표시 */}
                   <span
-                    className="input-slot"
+                    className="input-slot input-slot-eol"
                     data-position={i + 1}
-                    role="button"
-                    tabIndex={-1}
-                    aria-label={`커서 위치 ${i + 2}`}
-                    onMouseDown={(e) => {
-                      if (e.button !== 0) return;
-                      e.stopPropagation();
-                      dragAnchorStartRef.current = i + 1;
-                      dragAnchorEndRef.current = i + 1;
-                      isDraggingRef.current = true;
-                      setSelection(null);
-                      setCursorIndex(i + 1);
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (didDragRef.current) {
-                        didDragRef.current = false;
-                        return;
-                      }
-                      setSelection(null);
-                      setCursorIndex(i + 1);
-                    }}
+                    data-visual="secondary"
+                    aria-hidden="true"
                   >
-                    {cursorIndex === i + 1 && isCaretVisible && !(isTextMode && textEditIndex === null) && (
-                      <span className="input-caret">|</span>
-                    )}
+                    {cursorIndex === i + 1 &&
+                      isCaretVisible &&
+                      !(isTextMode && textEditIndex === null) &&
+                      linebreakCursor &&
+                      linebreakCursor.index === i + 1 &&
+                      linebreakCursor.mode === 'eol' && <span className="input-caret">|</span>}
                   </span>
                   <span
                     className="input-area-fill"
@@ -646,18 +673,26 @@ export default function App() {
                       if (e.button !== 0) return;
                       e.stopPropagation();
                       if (textEditIndex !== null) finishTextInput(currentText);
+                      if (e.shiftKey) {
+                        handleShiftClick(i + 1);
+                        return;
+                      }
+                      setLinebreakCursor({ index: i + 1, mode: 'eol' });
+                      selectionAnchorRef.current = i + 1;
                       setSelection(null);
                       setCursorIndex(i + 1);
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (e.shiftKey) return;
                       if (didDragRef.current) {
                         didDragRef.current = false;
                         return;
                       }
                       if (textEditIndex !== null) finishTextInput(currentText);
-                      setSelection(null);
-                      setCursorIndex(i + 1);
+                       /* 클릭으로 커서를 eol에 두고 싶을 때도 모드 유지 */
+                      setLinebreakCursor({ index: i + 1, mode: 'eol' });
+                      handleNormalClick(i + 1);
                     }}
                   />
                   <span className="input-linebreak" aria-hidden="true" />
@@ -673,15 +708,21 @@ export default function App() {
                 if (e.button !== 0) return;
                 e.stopPropagation();
                 if (textEditIndex !== null) finishTextInput(currentText);
+                if (e.shiftKey) { handleShiftClick(commands.length); return; }
+                setLinebreakCursor(null);
+                selectionAnchorRef.current = commands.length;
                 clearSelectionAndMoveCursorToEnd();
               }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (e.shiftKey) return;
                 if (didDragRef.current) {
                   didDragRef.current = false;
                   return;
                 }
                 if (textEditIndex !== null) finishTextInput(currentText);
+                setLinebreakCursor(null);
+                selectionAnchorRef.current = commands.length;
                 clearSelectionAndMoveCursorToEnd();
               }}
             />
