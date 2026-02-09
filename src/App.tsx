@@ -1,5 +1,5 @@
-import { useRef, useCallback, useEffect, Fragment, useState } from 'react';
-import { useCommandInput } from './hooks/useCommandInput.js';
+import { useRef, useCallback, useEffect, useLayoutEffect, Fragment, useState } from 'react';
+import { useCommandInput, type SlotPositionsRef } from './hooks/useCommandInput.js';
 import type { CommandItem, KeyMapping } from './types/index.js';
 import { KeyMappingPage, loadKeyMapping, saveKeyMapping } from './KeyMappingPage.js';
 import { GuideModal } from './GuideModal.js';
@@ -141,6 +141,9 @@ export default function App() {
   const [downloadBg, setDownloadBg] = useState<DownloadBg>('transparent');
   const [inputNotationMode, setInputNotationMode] = useState<InputNotationMode>('korean');
 
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+  const slotPositionsRef: SlotPositionsRef = useRef<{ tops: number[]; lefts: number[] } | null>(null);
+
   const {
     commands,
     cursorIndex,
@@ -157,7 +160,40 @@ export default function App() {
     updateText,
     startTextEdit,
     clearSelectionAndMoveCursorToEnd,
-  } = useCommandInput(keyMapping);
+  } = useCommandInput(keyMapping, slotPositionsRef);
+
+  useLayoutEffect(() => {
+    const el = inputAreaRef.current;
+    if (!el) return;
+    const MEASURE_DEBOUNCE_MS = 80;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const measure = () => {
+      const slots = el.querySelectorAll('.input-slot');
+      if (slots.length === 0) {
+        slotPositionsRef.current = null;
+        return;
+      }
+      const rects = Array.from(slots).map((s) => s.getBoundingClientRect());
+      slotPositionsRef.current = {
+        tops: rects.map((r) => r.top),
+        lefts: rects.map((r) => r.left),
+      };
+    };
+    const scheduleMeasure = () => {
+      if (timeoutId != null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        measure();
+      }, MEASURE_DEBOUNCE_MS);
+    };
+    measure();
+    const ro = new ResizeObserver(scheduleMeasure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [commands.length, page]);
 
   const dragAnchorStartRef = useRef<number>(0);
   const dragAnchorEndRef = useRef<number>(0);
@@ -443,7 +479,7 @@ export default function App() {
               </button>
             </div>
           </div>
-          <div className="input-area" tabIndex={0}>
+          <div ref={inputAreaRef} className="input-area" tabIndex={0}>
             {Array.from({ length: commands.length + 1 }, (_, i) => (
               <Fragment key={i}>
                 <span

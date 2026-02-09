@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { MutableRefObject } from 'react';
 import type { CommandItem, KeyMapping, DirectionNotation } from '../types/index.js';
 import {
   defaultKeyMapping,
@@ -35,7 +36,62 @@ const initialHistoryState: HistoryState = {
   selection: null,
 };
 
-export function useCommandInput(customMapping?: Partial<KeyMapping>) {
+/** 한 줄에 표시되는 슬롯 개수. 위치 정보 없을 때 위/아래 화살표 폴백용 */
+const DEFAULT_SLOTS_PER_ROW = 12;
+
+/** 슬롯별 화면 좌표. ArrowUp/Down 시 실제 줄·열 기준 이동에 사용 */
+export type SlotPositionsRef = MutableRefObject<{ tops: number[]; lefts: number[] } | null>;
+
+const ROW_TOLERANCE_PX = 4; /* 같은 줄로 볼 top 차이(px) */
+
+/** 현재 슬롯(cur) 기준 한 줄 위에서 같은 열(가장 가까운 left) 슬롯 인덱스. 없으면 -1 */
+function findSlotRowAbove(tops: number[], lefts: number[], cur: number): number {
+  const curTop = tops[cur] ?? 0;
+  const curLeft = lefts[cur] ?? 0;
+  const above = tops
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t < curTop - ROW_TOLERANCE_PX);
+  if (above.length === 0) return -1;
+  const rowAboveTop = Math.max(...above.map(({ t }) => t));
+  const inRow = above.filter(({ t }) => Math.abs(t - rowAboveTop) <= ROW_TOLERANCE_PX);
+  let best = -1;
+  let bestDist = Infinity;
+  for (const { i } of inRow) {
+    const dist = Math.abs(lefts[i] - curLeft);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** 현재 슬롯(cur) 기준 한 줄 아래에서 같은 열 슬롯 인덱스. 없으면 -1 */
+function findSlotRowBelow(tops: number[], lefts: number[], cur: number): number {
+  const curTop = tops[cur] ?? 0;
+  const curLeft = lefts[cur] ?? 0;
+  const below = tops
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t > curTop + ROW_TOLERANCE_PX);
+  if (below.length === 0) return -1;
+  const rowBelowTop = Math.min(...below.map(({ t }) => t));
+  const inRow = below.filter(({ t }) => Math.abs(t - rowBelowTop) <= ROW_TOLERANCE_PX);
+  let best = -1;
+  let bestDist = Infinity;
+  for (const { i } of inRow) {
+    const dist = Math.abs(lefts[i] - curLeft);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+export function useCommandInput(
+  customMapping?: Partial<KeyMapping>,
+  slotPositionsRef?: SlotPositionsRef
+) {
   const [commands, setCommands] = useState<CommandItem[]>([]);
   const [cursorIndex, setCursorIndexState] = useState(0);
   const [selection, setSelectionState] = useState<SelectionRange | null>(null);
@@ -457,6 +513,66 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         event.preventDefault();
         return;
       }
+      if (code === 'ArrowDown') {
+        historyFlagRef.current = 1;
+        const len = commandsLengthRef.current;
+        const cur = cursorIndexRef.current;
+        const pos = slotPositionsRef?.current;
+        let newCursor: number;
+        if (pos?.tops.length && pos?.lefts.length && cur < pos.tops.length) {
+          const j = findSlotRowBelow(pos.tops, pos.lefts, cur);
+          newCursor = j >= 0 ? j : Math.min(len, cur + DEFAULT_SLOTS_PER_ROW);
+        } else {
+          newCursor = Math.min(len, cur + DEFAULT_SLOTS_PER_ROW);
+        }
+        if (event.shiftKey) {
+          const sel = selectionRef.current;
+          if (sel && sel.start < sel.end) {
+            const anchor = sel.start + sel.end - cur;
+            const newStart = Math.min(newCursor, anchor);
+            const newEnd = Math.max(newCursor, anchor);
+            setSelectionState(newStart < newEnd ? { start: newStart, end: newEnd } : null);
+          } else {
+            setSelectionState(newCursor > cur ? { start: cur, end: newCursor } : null);
+          }
+          setCursorIndexState(newCursor);
+        } else {
+          setSelectionState(null);
+          setCursorIndexState(newCursor);
+        }
+        event.preventDefault();
+        return;
+      }
+
+      if (code === 'ArrowUp') {
+        historyFlagRef.current = 1;
+        const cur = cursorIndexRef.current;
+        const pos = slotPositionsRef?.current;
+        let newCursor: number;
+        if (pos?.tops.length && pos?.lefts.length && cur < pos.tops.length) {
+          const j = findSlotRowAbove(pos.tops, pos.lefts, cur);
+          newCursor = j >= 0 ? j : Math.max(0, cur - DEFAULT_SLOTS_PER_ROW);
+        } else {
+          newCursor = Math.max(0, cur - DEFAULT_SLOTS_PER_ROW);
+        }
+        if (event.shiftKey) {
+          const sel = selectionRef.current;
+          if (sel && sel.start < sel.end) {
+            const anchor = sel.start + sel.end - cur;
+            const newStart = Math.min(newCursor, anchor);
+            const newEnd = Math.max(newCursor, anchor);
+            setSelectionState(newStart < newEnd ? { start: newStart, end: newEnd } : null);
+          } else {
+            setSelectionState(newCursor < cur ? { start: newCursor, end: cur } : null);
+          }
+          setCursorIndexState(newCursor);
+        } else {
+          setSelectionState(null);
+          setCursorIndexState(newCursor);
+        }
+        event.preventDefault();
+        return;
+      }
 
       if (code === 'Home') {
         const active = document.activeElement as HTMLElement | null;
@@ -528,7 +644,7 @@ export function useCommandInput(customMapping?: Partial<KeyMapping>) {
         }
       }
     },
-    [isTextMode, toggleTextMode, addCommand, tryPushUndoState, undo, redo]
+    [isTextMode, toggleTextMode, addCommand, tryPushUndoState, undo, redo, slotPositionsRef]
   );
 
   const handleKeyUp = useCallback((event: KeyboardEvent) => {
