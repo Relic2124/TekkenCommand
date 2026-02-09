@@ -480,9 +480,12 @@ export default function App() {
             </div>
           </div>
           <div ref={inputAreaRef} className="input-area" tabIndex={0}>
-            {Array.from({ length: commands.length + 1 }, (_, i) => (
+            {Array.from({ length: commands.length + 1 }, (_, i) => {
+              const prevIsLinebreak = i > 0 && commands[i - 1].type === 'notation' && commands[i - 1].value === 'linebreak';
+              return (
               <Fragment key={i}>
               <span className="input-cell">
+                {!prevIsLinebreak && (
                 <span
                   className="input-slot"
                   data-position={i}
@@ -510,6 +513,7 @@ export default function App() {
                     <span className="input-caret">|</span>
                   )}
                 </span>
+                )}
                 {isTextMode && textEditIndex === null && i === cursorIndex ? (
                   <span className="text-cursor">
                     "
@@ -605,10 +609,63 @@ export default function App() {
                 )}
               </span>
               {i < commands.length && commands[i].type === 'notation' && commands[i].value === 'linebreak' && (
-                <span className="input-linebreak" aria-hidden="true" />
+                <>
+                  <span
+                    className="input-slot"
+                    data-position={i + 1}
+                    role="button"
+                    tabIndex={-1}
+                    aria-label={`커서 위치 ${i + 2}`}
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.stopPropagation();
+                      dragAnchorStartRef.current = i + 1;
+                      dragAnchorEndRef.current = i + 1;
+                      isDraggingRef.current = true;
+                      setSelection(null);
+                      setCursorIndex(i + 1);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (didDragRef.current) {
+                        didDragRef.current = false;
+                        return;
+                      }
+                      setSelection(null);
+                      setCursorIndex(i + 1);
+                    }}
+                  >
+                    {cursorIndex === i + 1 && isCaretVisible && !(isTextMode && textEditIndex === null) && (
+                      <span className="input-caret">|</span>
+                    )}
+                  </span>
+                  <span
+                    className="input-area-fill"
+                    aria-label="빈 영역"
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.stopPropagation();
+                      if (textEditIndex !== null) finishTextInput(currentText);
+                      setSelection(null);
+                      setCursorIndex(i + 1);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (didDragRef.current) {
+                        didDragRef.current = false;
+                        return;
+                      }
+                      if (textEditIndex !== null) finishTextInput(currentText);
+                      setSelection(null);
+                      setCursorIndex(i + 1);
+                    }}
+                  />
+                  <span className="input-linebreak" aria-hidden="true" />
+                </>
               )}
               </Fragment>
-            ))}
+              );
+            })}
             <span
               className="input-area-fill"
               aria-label="빈 영역"
