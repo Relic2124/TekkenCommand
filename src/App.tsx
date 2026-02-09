@@ -679,6 +679,9 @@ export default function App() {
                       }
                       setLinebreakCursor({ index: i + 1, mode: 'eol' });
                       selectionAnchorRef.current = i + 1;
+                      dragAnchorStartRef.current = i + 1;
+                      dragAnchorEndRef.current = i + 1;
+                      isDraggingRef.current = true;
                       setSelection(null);
                       setCursorIndex(i + 1);
                     }}
@@ -711,6 +714,9 @@ export default function App() {
                 if (e.shiftKey) { handleShiftClick(commands.length); return; }
                 setLinebreakCursor(null);
                 selectionAnchorRef.current = commands.length;
+                dragAnchorStartRef.current = commands.length;
+                dragAnchorEndRef.current = commands.length;
+                isDraggingRef.current = true;
                 clearSelectionAndMoveCursorToEnd();
               }}
               onClick={(e) => {
