@@ -242,6 +242,7 @@ export default function App() {
       let maxP: number;
       const cmdEl = el?.closest?.('[data-command-index]');
       const posEl = el?.closest?.('[data-position]');
+      const fillEl = el?.closest?.('.input-area-fill[data-position]');
       if (cmdEl) {
         const i = parseInt((cmdEl as HTMLElement).getAttribute('data-command-index') ?? '', 10);
         if (!Number.isNaN(i)) {
@@ -254,6 +255,10 @@ export default function App() {
         } else return;
       } else if (posEl) {
         const p = parseInt((posEl as HTMLElement).getAttribute('data-position') ?? '', 10);
+        if (Number.isNaN(p)) return;
+        minP = maxP = p;
+      } else if (fillEl) {
+        const p = parseInt((fillEl as HTMLElement).getAttribute('data-position') ?? '', 10);
         if (Number.isNaN(p)) return;
         minP = maxP = p;
       } else return;
@@ -668,6 +673,7 @@ export default function App() {
                   </span>
                   <span
                     className="input-area-fill"
+                    data-position={i + 1}
                     aria-label="빈 영역"
                     onMouseDown={(e) => {
                       if (e.button !== 0) return;
@@ -706,6 +712,7 @@ export default function App() {
             })}
             <span
               className="input-area-fill"
+              data-position={commands.length}
               aria-label="빈 영역"
               onMouseDown={(e) => {
                 if (e.button !== 0) return;
