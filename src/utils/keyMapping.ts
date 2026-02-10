@@ -1,4 +1,4 @@
-import type { KeyMapping, DirectionNotation, ButtonNotation } from '../types/index.js';
+import type { KeyMapping, DirectionNotation, ButtonNotation, NotationMappingKey } from '../types/index.js';
 
 /** 키 코드를 읽기 쉬운 이름으로 (KeyW → W, Numpad4 → Num 4) */
 export function keyCodeToLabel(code: string): string {
@@ -37,8 +37,17 @@ export const defaultKeyMapping: KeyMapping = {
     '3+4': ['Numpad3'],
   },
   special: {
-    heat: ['Numpad7'], // 2+3 동시도 나중에 처리
-    rage: ['Numpad9'], // df+1+2 또는 넘패드9
+    heat: ['Numpad7'],
+    rage: ['Numpad9'],
+  },
+  notation: {
+    next: ['Space'],
+    bracketl: ['BracketLeft'],
+    bracketr: ['BracketRight'],
+    parenl: [], // 기본 ( 키
+    parenr: [], // 기본 ) 키
+    tilde: ['Backquote'],
+    linebreak: ['Backslash'],
   },
 };
 
@@ -109,12 +118,23 @@ export function findButtonFromKeys(
   return sorted.join('+') as ButtonNotation;
 }
 
-/** 특수 커맨드: Numpad7=heat, Numpad9=rage 전용 (키 조합 제거로 1+2+3·f+2+3 등과 충돌 방지) */
+/** 특수 커맨드: Numpad7=heat, Numpad9=rage 전용 */
 export function findSpecialFromKeys(
   pressedKeys: Set<string>,
   mapping: KeyMapping
 ): 'heat' | 'rage' | null {
   if (mapping.special.heat.some((k) => pressedKeys.has(k))) return 'heat';
   if (mapping.special.rage.some((k) => pressedKeys.has(k))) return 'rage';
+  return null;
+}
+
+/** 노테이션 매핑에서 해당 키 코드가 할당된 항목 반환 (배열 순서: next, bracketl, bracketr, parenl, parenr, tilde, linebreak) */
+export function getNotationByCode(code: string, mapping: KeyMapping): NotationMappingKey | null {
+  const n = mapping.notation ?? {};
+  const keys: NotationMappingKey[] = ['next', 'bracketl', 'bracketr', 'parenl', 'parenr', 'tilde', 'linebreak'];
+  for (const k of keys) {
+    const arr = n[k];
+    if (arr?.length && arr.includes(code)) return k;
+  }
   return null;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { KeyMapping } from './types/index.js';
+import type { KeyMapping, NotationMappingKey } from './types/index.js';
 import { defaultKeyMapping } from './utils/keyMapping.js';
 import { keyCodeToLabel, keyCodesToLabel } from './utils/keyMapping.js';
 import { getNotationImageUrl } from './utils/notationImages.js';
@@ -53,7 +53,14 @@ export function loadKeyMapping(): KeyMapping {
     heat: saved.special?.heat != null ? ensureStringArray(saved.special.heat) : defaultKeyMapping.special.heat,
     rage: saved.special?.rage != null ? ensureStringArray(saved.special.rage) : defaultKeyMapping.special.rage,
   };
-  return { directions, buttons, special };
+  const notation: KeyMapping['notation'] = { ...defaultKeyMapping.notation };
+  if (saved.notation && typeof saved.notation === 'object') {
+    const keys: NotationMappingKey[] = ['next', 'bracketl', 'bracketr', 'parenl', 'parenr', 'tilde', 'linebreak'];
+    for (const k of keys) {
+      if (saved.notation![k] != null) notation[k] = ensureStringArray(saved.notation[k]);
+    }
+  }
+  return { directions, buttons, special, notation };
 }
 
 type Theme = 'light' | 'dark';
@@ -95,6 +102,17 @@ const DIAGONAL_KEYS = ['ub', 'uf', 'db', 'df'] as const;
 const SHOW_DIAGONAL_STORAGE_KEY = 'tekken-keymap-show-diagonal';
 const SHOW_ADDITIONAL_BUTTONS_STORAGE_KEY = 'tekken-keymap-show-additional-buttons';
 
+/** 노테이션 키가 비어 있을 때 표시할 기본 키 이름 */
+const NOTATION_DEFAULT_DISPLAY: Record<NotationMappingKey, string> = {
+  next: 'Space',
+  bracketl: '[',
+  bracketr: ']',
+  parenl: '(',
+  parenr: ')',
+  tilde: '~',
+  linebreak: '\\',
+};
+
 /** 매핑 전체에서 해당 키 코드를 제거한 새 KeyMapping 반환 */
 function removeCodeFromMapping(mapping: KeyMapping, code: string): KeyMapping {
   const filter = (arr: string[]) => arr.filter((c) => c !== code);
@@ -106,6 +124,12 @@ function removeCodeFromMapping(mapping: KeyMapping, code: string): KeyMapping {
   for (const k of Object.keys(mapping.buttons)) {
     buttons[k] = filter(ensureStringArray(mapping.buttons[k] ?? []));
   }
+  const notation = mapping.notation ? { ...mapping.notation } : undefined;
+  if (notation) {
+    for (const k of Object.keys(notation) as (keyof typeof notation)[]) {
+      if (Array.isArray(notation[k])) notation[k] = filter(notation[k] as string[]);
+    }
+  }
   return {
     directions,
     buttons,
@@ -113,6 +137,7 @@ function removeCodeFromMapping(mapping: KeyMapping, code: string): KeyMapping {
       heat: filter(mapping.special.heat),
       rage: filter(mapping.special.rage),
     },
+    ...(notation ? { notation } : {}),
   };
 }
 
@@ -152,33 +177,37 @@ function isCodeUsedElsewhere(
   if (current.type !== 'special') {
     if (hasCode(mapping.special.heat) || hasCode(mapping.special.rage)) return true;
   }
+  if (current.type === 'notation') {
+    for (const [k, arr] of Object.entries(mapping.notation ?? {})) {
+      if (k === current.key) continue;
+      if (Array.isArray(arr) && hasCode(arr)) return true;
+    }
+  }
+  if (current.type !== 'notation' && mapping.notation) {
+    for (const arr of Object.values(mapping.notation)) {
+      if (Array.isArray(arr) && hasCode(arr)) return true;
+    }
+  }
   return false;
 }
 
 type ListeningSlot =
   | { type: 'direction'; key: 'u' | 'd' | 'f' | 'b' | 'n' | 'ub' | 'uf' | 'db' | 'df' }
   | { type: 'button'; key: string }
-  | { type: 'special'; key: 'heat' | 'rage' };
+  | { type: 'special'; key: 'heat' | 'rage' }
+  | { type: 'notation'; key: NotationMappingKey };
 
 const MODIFIER_CODES = new Set([
   'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight',
   'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight',
 ]);
 
-/** 키 매핑에 사용 불가: 물리 키 기준. Enter, Space, Backspace/Delete, [ ] 키, ` ~ 키, Home/End(슬롯 커서). ( ) 는 e.key로만 막음 */
-const FORBIDDEN_KEY_CODES = new Set([
-  'Enter', 'Space', 'Backspace', 'Delete',
-  'BracketLeft', 'BracketRight', 'Backquote',
-  'Home', 'End',
-]);
-const FORBIDDEN_KEYS = new Set(['(', ')']);
+/** 슬롯 이동용으로만 예약: 매핑 불가 */
+const FORBIDDEN_KEY_CODES = new Set(['Home', 'End']);
+const FORBIDDEN_KEYS = new Set<string>();
 
 /** 금지된 물리 키(e.code)에 대해 플래시에 보여줄 문자 */
-const FORBIDDEN_CODE_DISPLAY: Record<string, string> = {
-  BracketLeft: '[',
-  BracketRight: ']',
-  Backquote: '~',
-};
+const FORBIDDEN_CODE_DISPLAY: Record<string, string> = {};
 
 function isListeningFor(listening: ListeningSlot | null, type: ListeningSlot['type'], key: string): boolean {
   if (!listening || listening.type !== type) return false;
@@ -296,6 +325,11 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
         next = {
           ...cleared,
           buttons: { ...cleared.buttons, [listeningFor.key]: [code] },
+        };
+      } else if (listeningFor.type === 'notation') {
+        next = {
+          ...cleared,
+          notation: { ...(cleared.notation ?? {}), [listeningFor.key]: [code] },
         };
       } else {
         next = {
@@ -548,12 +582,16 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                   <button
                     type="button"
                     className="keymap-key-btn"
-                    onClick={() => setListeningFor(
-                      isListeningFor(listeningFor, 'special', 'heat') ? null : { type: 'special', key: 'heat' }
-                    )}
+                    onClick={() =>
+                      setListeningFor(
+                        isListeningFor(listeningFor, 'special', 'heat') ? null : { type: 'special', key: 'heat' }
+                      )
+                    }
                   >
                     {isListeningFor(listeningFor, 'special', 'heat')
-                      ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                      ? forbiddenKeyFlash
+                        ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span>
+                        : '키 입력 대기...'
                       : keyCodesToLabel(ensureStringArray(keyMapping.special.heat))}
                   </button>
                 </td>
@@ -567,18 +605,75 @@ export function KeyMappingPage({ keyMapping, onMappingChange, onBack, theme, onT
                   <button
                     type="button"
                     className="keymap-key-btn"
-                    onClick={() => setListeningFor(
-                      isListeningFor(listeningFor, 'special', 'rage') ? null : { type: 'special', key: 'rage' }
-                    )}
+                    onClick={() =>
+                      setListeningFor(
+                        isListeningFor(listeningFor, 'special', 'rage') ? null : { type: 'special', key: 'rage' }
+                      )
+                    }
                   >
                     {isListeningFor(listeningFor, 'special', 'rage')
-                      ? (forbiddenKeyFlash ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span> : '키 입력 대기...')
+                      ? forbiddenKeyFlash
+                        ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span>
+                        : '키 입력 대기...'
                       : keyCodesToLabel(ensureStringArray(keyMapping.special.rage))}
                   </button>
                 </td>
               </tr>
             </tbody>
           </table>
+
+          <h3 style={{ marginTop: '1rem', marginBottom: '0.25rem', fontSize: '0.95rem' }}>노테이션 입력</h3>
+          <p style={{ marginTop: 0, marginBottom: '0.5rem', fontSize: '0.8rem', color: 'var(--muted)' }}>
+            ▶, [ ], ( ), ~, 줄바꿈(↵) 등 표기 입력에 쓸 키를 바꿀 수 있습니다. 비어 있으면 아래 표시된 기본 키로 동작합니다.
+          </p>
+          <table className="keymap-table">
+            <thead>
+              <tr>
+                <th>표기</th>
+                <th>키</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  { key: 'next' as const, label: '▶ (next)' },
+                  { key: 'bracketl' as const, label: '[' },
+                  { key: 'bracketr' as const, label: ']' },
+                  { key: 'parenl' as const, label: '(' },
+                  { key: 'parenr' as const, label: ')' },
+                  { key: 'tilde' as const, label: '~' },
+                  { key: 'linebreak' as const, label: '↵ (줄바꿈)' },
+                ] as const
+              ).map(({ key, label }) => {
+                const listening = isListeningFor(listeningFor, 'notation', key);
+                const codes = ensureStringArray(keyMapping.notation?.[key] ?? []);
+                const display = codes.length ? keyCodesToLabel(codes) : NOTATION_DEFAULT_DISPLAY[key];
+                return (
+                  <tr key={key}>
+                    <td className="keymap-cmd-cell">
+                      <span>{label}</span>
+                    </td>
+                    <td className="keymap-keys">
+                      <button
+                        type="button"
+                        className="keymap-key-btn"
+                        onClick={() =>
+                          setListeningFor(listening ? null : { type: 'notation', key })
+                        }
+                      >
+                        {listening
+                          ? forbiddenKeyFlash
+                            ? <span className="keymap-forbidden-flash">{forbiddenKeyFlash}</span>
+                            : '키 입력 대기...'
+                          : display}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
         </section>
 
         <div className="keymap-actions">

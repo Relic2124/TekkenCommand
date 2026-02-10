@@ -457,6 +457,10 @@
   overflow: visible;
 }
 
+.keymap-table tbody td {
+  min-height: 4rem;
+}
+
 /* 열 너비: 헤더(th)에만 지정 — fixed 레이아웃이라 이 열 전체(본문 포함)가 같은 너비가 됨 */
 .keymap-table th:nth-child(1) {
   width: 200px;
@@ -568,6 +572,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 1.25rem;
+  min-height: 2.25rem;
 }
 
 .keymap-cmd-cell .keymap-cmd-img {

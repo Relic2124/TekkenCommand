@@ -25,7 +25,10 @@ export type CommandItem =
   | { type: 'notation'; value: NotationImage }
   | { type: 'text'; value: string };
 
-/** 키 매핑: 방향 u,d,f,b,n + 선택적 대각선(ub,uf,db,df) 전용 키 */
+/** 노테이션 입력(▶, [, ], (, ), ~, ↵)에 매핑할 키 코드 */
+export type NotationMappingKey = 'next' | 'bracketl' | 'bracketr' | 'parenl' | 'parenr' | 'tilde' | 'linebreak';
+
+/** 키 매핑: 방향 u,d,f,b,n + 선택적 대각선(ub,uf,db,df) 전용 키 + 노테이션 */
 export interface KeyMapping {
   directions: {
     u: string[];
@@ -33,7 +36,6 @@ export interface KeyMapping {
     f: string[];
     b: string[];
     n: string[];
-    /** 있으면 해당 키로 대각선 인식, 없으면 위/아래+왼/오 조합으로 계산 */
     ub?: string[];
     uf?: string[];
     db?: string[];
@@ -44,4 +46,6 @@ export interface KeyMapping {
     heat: string[];
     rage: string[];
   };
+  /** ▶ next, [ ] ( ) ~ ↵ 줄바꿈 등 노테이션 입력 키. 비어 있으면 기본 키(문자) 사용 */
+  notation?: Partial<Record<NotationMappingKey, string[]>>;
 }

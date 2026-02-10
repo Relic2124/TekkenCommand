@@ -6,6 +6,7 @@ import {
   findDirectionFromKeys,
   findButtonFromKeys,
   findSpecialFromKeys,
+  getNotationByCode,
 } from '../utils/keyMapping.js';
 import { commandsToCopyText, parsePasteText } from '../utils/commandClipboard.js';
 
@@ -414,15 +415,6 @@ export function useCommandInput(
         return;
       }
 
-      if (code === 'Space') {
-        if (!event.repeat) {
-          tryPushUndoState('insert');
-          addCommand({ type: 'notation', value: 'next' });
-        }
-        event.preventDefault();
-        return;
-      }
-
       pressedKeys.current.add(code);
 
       if (code === 'Enter') {
@@ -605,38 +597,69 @@ export function useCommandInput(
       }
 
       if (!event.repeat) {
+        const mapping = keyMapping.current;
+        const n = mapping.notation ?? {};
+        const notationFromCode = getNotationByCode(code, mapping);
+
+        if (notationFromCode === 'next') {
+          tryPushUndoState('insert');
+          addCommand({ type: 'notation', value: 'next' });
+          event.preventDefault();
+          return;
+        }
+        if (notationFromCode === 'linebreak') {
+          tryPushUndoState('always');
+          addCommand({ type: 'notation', value: 'linebreak' });
+          event.preventDefault();
+          return;
+        }
+
         const key = event.key;
-        if (code === 'BracketLeft' || key === '[') {
+        const defaultNext = !n.next?.length && code === 'Space';
+        const defaultBracketl = !n.bracketl?.length && (code === 'BracketLeft' || key === '[');
+        const defaultBracketr = !n.bracketr?.length && (code === 'BracketRight' || key === ']');
+        const defaultParenl = !n.parenl?.length && key === '(';
+        const defaultParenr = !n.parenr?.length && key === ')';
+        const defaultTilde = !n.tilde?.length && (key === '~' || (code === 'Backquote' && event.shiftKey));
+        const defaultLinebreak = !n.linebreak?.length && (code === 'Backslash' || key === '\\');
+
+        if (defaultNext) {
+          tryPushUndoState('insert');
+          addCommand({ type: 'notation', value: 'next' });
+          event.preventDefault();
+          return;
+        }
+        if (notationFromCode === 'bracketl' || defaultBracketl) {
           tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'bracketl' });
           event.preventDefault();
           return;
         }
-        if (code === 'BracketRight' || key === ']') {
+        if (notationFromCode === 'bracketr' || defaultBracketr) {
           tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'bracketr' });
           event.preventDefault();
           return;
         }
-        if (key === '(') {
+        if (notationFromCode === 'parenl' || defaultParenl) {
           tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'parenl' });
           event.preventDefault();
           return;
         }
-        if (key === ')') {
+        if (notationFromCode === 'parenr' || defaultParenr) {
           tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'parenr' });
           event.preventDefault();
           return;
         }
-        if (key === '~' || (code === 'Backquote' && event.shiftKey)) {
+        if (notationFromCode === 'tilde' || defaultTilde) {
           tryPushUndoState('insert');
           addCommand({ type: 'notation', value: 'tilde' });
           event.preventDefault();
           return;
         }
-        if (code === 'Backslash' || key === '\\') {
+        if (defaultLinebreak) {
           tryPushUndoState('always');
           addCommand({ type: 'notation', value: 'linebreak' });
           event.preventDefault();
