@@ -81,6 +81,29 @@ type Page = 'main' | 'keymap';
 type Theme = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'tekken-theme';
+const APP_VERSION = '1.0.0';
+const GITHUB_ISSUES_URL = 'https://github.com/Relic2124/TekkenCommand/issues/new';
+
+function getReportBugUrl(): string {
+  const body = [
+    '**현상 (무슨 문제인가요?)**',
+    '',
+    '',
+    '**재현 방법**',
+    '1. ',
+    '2. ',
+    '',
+    '**환경**',
+    `- 앱 버전: ${APP_VERSION}`,
+    `- 브라우저: ${typeof navigator !== 'undefined' ? navigator.userAgent : '-'}`,
+    `- URL: ${typeof window !== 'undefined' ? window.location.href : '-'}`,
+  ].join('\n');
+  const params = new URLSearchParams({
+    title: '오류 제보',
+    body,
+  });
+  return `${GITHUB_ISSUES_URL}?${params.toString()}`;
+}
 
 function getSystemTheme(): Theme {
   if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
@@ -489,6 +512,15 @@ export default function App() {
           <button type="button" className="nav-link" onClick={() => setPage('keymap')}>
             키 매핑
           </button>
+          <a
+            href={getReportBugUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="nav-link nav-link-anchor"
+            title="GitHub Issues로 오류·개선 사항 제보"
+          >
+            오류 제보
+          </a>
         </nav>
       </header>
 
